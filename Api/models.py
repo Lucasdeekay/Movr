@@ -72,7 +72,7 @@ class SocialMediaLink(models.Model):
 
 
 class Vehicle(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='kyc')
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='vehicle')
     vehicle_plate_number = models.CharField(max_length=50, unique=True, null=True, blank=True)
     vehicle_type = models.CharField(max_length=50, null=True, blank=True)
     vehicle_brand = models.CharField(max_length=50, null=True, blank=True)
@@ -111,8 +111,8 @@ class SubscriptionPlan(models.Model):
         (Decimal(9400.00), '#9,400'),
         (Decimal(15200.00), '#15,200')
     )
-    name = models.CharField(max_length=100, default='free')
-    price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal(0.00))
+    name = models.CharField(max_length=100, default='free', choices=NAME_CHOICES)
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal(0.00), choices=PRICE_CHOICES)
     duration = models.IntegerField(default=30, help_text="Duration in days")
 
     def __str__(self):
@@ -120,7 +120,7 @@ class SubscriptionPlan(models.Model):
 
 
 class Subscription(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='subscription')
     plan = models.ForeignKey(SubscriptionPlan, on_delete=models.CASCADE)
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField()
@@ -130,7 +130,7 @@ class Subscription(models.Model):
 
 
 class OTP(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='otp')
     code = models.CharField(max_length=4, unique=True)
     is_used = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -157,6 +157,63 @@ class OTP(models.Model):
             [self.user.email],
             fail_silently=False,
         )
+
+
+class Day(models.Model):
+    DAY_CHOICES = [
+        ('monday', 'Monday'),
+        ('tuesday', 'Tuesday'),
+        ('wednesday', 'Wednesday'),
+        ('thursday', 'Thursday'),
+        ('friday', 'Friday'),
+        ('saturday', 'Saturday'),
+        ('sunday', 'Sunday'),
+    ]
+    name = models.CharField(max_length=10, choices=DAY_CHOICES, unique=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Route(models.Model):
+    TRANSPORTATION_MODE_CHOICES = [
+        ('public', 'Public'),
+        ('bike', 'Bike'),
+        ('car', 'Car'),
+        ('train', 'Train'),
+        ('bus', 'Bus'),
+        ('aeroplane', 'Aeroplane'),
+    ]
+
+    SERVICE_TYPE_CHOICES = [
+        ('ride', 'Ride'),
+        ('delivery', 'Delivery'),
+    ]
+
+    user = models.ForeignKey('CustomUser', on_delete=models.CASCADE, related_name='routes')
+    title = models.CharField(max_length=255)
+    location = models.CharField(max_length=255)
+    destination = models.CharField(max_length=255)
+    stop_location = models.CharField(max_length=255, null=True, blank=True)
+    transportation_mode = models.CharField(max_length=20, choices=TRANSPORTATION_MODE_CHOICES)
+    service_type = models.CharField(max_length=20, choices=SERVICE_TYPE_CHOICES, null=True, blank=True)
+    departure_time = models.DateTimeField()
+    ticket_image = models.ImageField(upload_to='tickets/', null=True, blank=True)
+    is_live = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Route from {self.location} to {self.destination} by {self.user.email}"
+
+
+class ScheduledRoute(models.Model):
+    route = models.OneToOneField(Route, on_delete=models.CASCADE, related_name='scheduled_route')
+    is_returning = models.BooleanField(default=False)
+    returning_time = models.DateTimeField(null=True, blank=True)
+    is_repeated = models.BooleanField(default=False)
+    days_of_week = models.ManyToManyField('Day', blank=True)
+
+    def __str__(self):
+        return f"Scheduled Route for {self.route.user.email} from {self.route.location} to {self.route.destination}"
 
 
 #

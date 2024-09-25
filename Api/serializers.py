@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
-from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink
+from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
+    Route, ScheduledRoute, Day
 
 
 class TokenSerializer(serializers.ModelSerializer):
@@ -12,14 +13,14 @@ class TokenSerializer(serializers.ModelSerializer):
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ['id', 'email', 'first_name', 'last_name', 'phone_number', 'is_email_verified', 'profile_picture', 'two_factor_enabled', 'date_joined']
+        fields = '__all__'
 
 class KYCSerializer(serializers.ModelSerializer):
     user = CustomUserSerializer(read_only=True)
 
     class Meta:
         model = KYC
-        fields = ['user', 'bvn', 'nin', 'verified']
+        fields = '__all__'
 
 class SocialMediaLinkSerializer(serializers.ModelSerializer):
     class Meta:
@@ -31,19 +32,19 @@ class VehicleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Vehicle
-        fields = ['user', 'vehicle_plate_number', 'vehicle_type', 'vehicle_brand', 'vehicle_color', 'vehicle_photo', 'driver_license', 'vehicle_inspector_report', 'vehicle_insurance']
+        fields = '__all__'
 
 class PaymentMethodSerializer(serializers.ModelSerializer):
     user = CustomUserSerializer(read_only=True)
 
     class Meta:
         model = PaymentMethod
-        fields = ['user', 'method_name', 'account_details']
+        fields = '__all__'
 
 class SubscriptionPlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubscriptionPlan
-        fields = ['id', 'name', 'description', 'price', 'duration']
+        fields = '__all__'
 
 class SubscriptionSerializer(serializers.ModelSerializer):
     user = CustomUserSerializer(read_only=True)
@@ -51,14 +52,14 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Subscription
-        fields = ['user', 'plan', 'start_date', 'end_date']
+        fields = '__all__'
 
 class OTPSerializer(serializers.ModelSerializer):
     user = CustomUserSerializer(read_only=True)
 
     class Meta:
         model = OTP
-        fields = ['user', 'code', 'is_used', 'created_at', 'expires_at']
+        fields = '__all__'
 
 class OTPVerificationSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -75,6 +76,35 @@ class OTPVerificationSerializer(serializers.Serializer):
             return data
         except OTP.DoesNotExist:
             raise serializers.ValidationError("Invalid OTP")
+
+
+class RouteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Route
+        fields = '__all__'
+
+
+class ScheduledRouteSerializer(serializers.ModelSerializer):
+    route = RouteSerializer()
+    days_of_week = serializers.SlugRelatedField(many=True, slug_field='name', queryset=Day.objects.all())
+
+    class Meta:
+        model = ScheduledRoute
+        fields = '__all__'
+
+    def create(self, validated_data):
+        route_data = validated_data.pop('route')
+        days_data = validated_data.pop('days_of_week')
+        route = Route.objects.create(**route_data)
+        scheduled_route = ScheduledRoute.objects.create(route=route, **validated_data)
+        scheduled_route.days_of_week.set(days_data)
+        return scheduled_route
+
+
+class DaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Day
+        fields = '__all__'
 
 
 

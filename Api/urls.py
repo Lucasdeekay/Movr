@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .viewsets import (
     CustomUserViewSet, KYCViewSet, VehicleViewSet,
     PaymentMethodViewSet, SubscriptionPlanViewSet,
-    SubscriptionViewSet, OTPViewSet, SocialMediaLinkViewSet
+    SubscriptionViewSet, OTPViewSet, SocialMediaLinkViewSet, RouteViewSet, ScheduledRouteViewSet, DayViewSet
 )
 from .views import (
     RegisterView,
@@ -11,7 +11,8 @@ from .views import (
     LoginView,
     LogoutView,
     ForgotPasswordRequestOTPView,
-    ResetPasswordView, UpdateKYCView, UpdateVehicleInfoView, UpdatePersonalInfoView, UpdateSubscriptionPlanView
+    ResetPasswordView, UpdateKYCView, UpdateVehicleInfoView, UpdatePersonalInfoView, UpdateSubscriptionPlanView,
+    CreateRouteView, CreateScheduledRouteView, UserRoutesView, TotalLiveRoutesView, ToggleIsLiveRouteView
 )
 
 # Initialize the router
@@ -26,6 +27,9 @@ router.register(r'payment-methods', PaymentMethodViewSet, basename='payment-meth
 router.register(r'subscription-plans', SubscriptionPlanViewSet, basename='subscription-plan')
 router.register(r'subscriptions', SubscriptionViewSet, basename='subscription')
 router.register(r'otps', OTPViewSet, basename='otp')
+router.register(r'routes', RouteViewSet, basename='route')
+router.register(r'scheduled-routes', ScheduledRouteViewSet, basename='scheduled-route')
+router.register(r'days', DayViewSet, basename='day')
 
 # Include the router in your URL patterns
 urlpatterns = [
@@ -39,5 +43,10 @@ urlpatterns = [
     path('update-vehicle/', UpdateVehicleInfoView.as_view(), name='update_vehicle'),
     path('update-personal-info/', UpdatePersonalInfoView.as_view(), name='update_personal_info'),
     path('update-subscription/', UpdateSubscriptionPlanView.as_view(), name='update_subscription'),
+    path('create-route/', CreateRouteView.as_view(), name='create-route'),
+    path('create-scheduled-route/', CreateScheduledRouteView.as_view(), name='create-scheduled-route'),
+    path('user-routes/', UserRoutesView.as_view(), name='user-routes'),
+    path('total-live-routes/', TotalLiveRoutesView.as_view(), name='total-live-routes'),
+    path('toggle-is-live/<int:route_id>/', ToggleIsLiveRouteView.as_view(), name='toggle-is-live'),
     path('api/', include(router.urls)),
 ]

@@ -169,6 +169,8 @@ CORS_ALLOW_CREDENTIALS = True
 #     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
 # }
 
+AUTH_USER_MODEL = 'Api.CustomUser'
+
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'

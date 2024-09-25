@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink
+from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
+    Route, ScheduledRoute, Day
 
 
 @admin.register(CustomUser)
@@ -49,6 +50,25 @@ class OTPAdmin(admin.ModelAdmin):
     search_fields = ('user__email', 'code')
     list_filter = ('is_used', 'created_at', 'expires_at')
 
+@admin.register(Route)
+class RouteAdmin(admin.ModelAdmin):
+    list_display = ('user', 'title', 'location', 'destination', 'transportation_mode', 'service_type', 'departure_time', 'is_live')
+    search_fields = ('user__email', 'title', 'location', 'destination', 'transportation_mode')
+    list_filter = ('transportation_mode', 'service_type', 'is_live')
+    ordering = ('-departure_time',)
+
+@admin.register(ScheduledRoute)
+class ScheduledRouteAdmin(admin.ModelAdmin):
+    list_display = ('route', 'is_returning', 'is_repeated', 'returning_time')
+    search_fields = ('route__user__email', 'route__location', 'route__destination')
+    list_filter = ('is_returning', 'is_repeated')
+    ordering = ('-route__departure_time',)
+
+@admin.register(Day)
+class DayAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)
+    ordering = ('name',)
 
 
 

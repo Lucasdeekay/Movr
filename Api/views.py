@@ -16,7 +16,7 @@ from django_ratelimit.decorators import ratelimit
 from django.core.mail import send_mail
 from .models import CustomUser, KYC, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink
 from .serializers import CustomUserSerializer, OTPVerificationSerializer, TokenSerializer, VehicleSerializer, \
-    KYCSerializer, SocialMediaLinkSerializer
+    KYCSerializer, SocialMediaLinkSerializer, RouteSerializer, ScheduledRouteSerializer
 from rest_framework.authtoken.models import Token
 import random
 
@@ -265,3 +265,152 @@ class UpdateSubscriptionPlanView(APIView):
         subscription.save()
 
         return Response({"message": "Subscription plan updated successfully."}, status=status.HTTP_200_OK)
+
+
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
+from .models import Route, ScheduledRoute, Day
+
+# Create Route View
+class CreateRouteView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # Collect fields from the request
+        user = request.user
+        location = request.data.get('location')
+        destination = request.data.get('destination')
+        stop_location = request.data.get('stop_location', None)
+        transportation_mode = request.data.get('transportation_mode')
+        service_type = request.data.get('service_type', None)
+        departure_time = request.data.get('departure_time')
+        ticket_image = request.FILES.get('ticket_image', None)
+
+        # Validate required fields
+        if not location or not destination or not transportation_mode or not departure_time:
+            return Response({"error": "Location, destination, transportation mode, and departure time are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create and save the Route instance
+        route = Route.objects.create(
+            user=user,
+            location=location,
+            destination=destination,
+            stop_location=stop_location,
+            transportation_mode=transportation_mode,
+            service_type=service_type,
+            departure_time=departure_time,
+            ticket_image=ticket_image,
+        )
+
+        serializer = RouteSerializer(route)
+
+        return Response({"message": "Route created successfully.", "route": serializer.data}, status=status.HTTP_201_CREATED)
+
+
+# Create Scheduled Route View
+class CreateScheduledRouteView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # Collect fields for the associated Route
+        user = request.user
+        location = request.data.get('location')
+        destination = request.data.get('destination')
+        stop_location = request.data.get('stop_location', None)
+        transportation_mode = request.data.get('transportation_mode')
+        service_type = request.data.get('service_type', None)
+        departure_time = request.data.get('departure_time')
+        ticket_image = request.FILES.get('ticket_image', None)
+
+        # Validate required fields for the Route
+        if not location or not destination or not transportation_mode or not departure_time:
+            return Response({"error": "Location, destination, transportation mode, and departure time are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create the Route instance
+        route = Route.objects.create(
+            user=user,
+            location=location,
+            destination=destination,
+            stop_location=stop_location,
+            transportation_mode=transportation_mode,
+            service_type=service_type,
+            departure_time=departure_time,
+            ticket_image=ticket_image,
+        )
+
+        # Collect fields for ScheduledRoute
+        is_returning = True if request.data.get('is_returning', False) == 'True' else False
+        is_repeated = True if request.data.get('is_repeated', False) == 'True' else False
+        returning_time = request.data.get('returning_time', None)
+        days_of_week_ids = request.data.get('days_of_week', [])
+
+        # Validate schedule fields
+        if is_repeated and not days_of_week_ids:
+            return Response({"error": "Days of week must be provided if the route is repeated."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create the ScheduledRoute instance
+        scheduled_route = ScheduledRoute.objects.create(
+            route=route,
+            is_returning=is_returning,
+            returning_time=returning_time,
+            is_repeated=is_repeated
+        )
+
+        # Add days of the week to the schedule
+        for day_id in days_of_week_ids:
+            day = get_object_or_404(Day, id=day_id)
+            scheduled_route.days_of_week.add(day)
+
+        serializer = ScheduledRouteSerializer(scheduled_route)
+
+        return Response({"message": "Scheduled Route created successfully.", "scheduled_route": serializer.data}, status=status.HTTP_201_CREATED)
+
+
+# Get all user routes view
+class UserRoutesView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        routes = Route.objects.filter(user=user)
+        serializer = RouteSerializer(routes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+# Get total number of live routes view
+class TotalLiveRoutesView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        live_routes_count = Route.objects.filter(user=user, is_live=True).count()
+        return Response({"live_routes_count": live_routes_count}, status=status.HTTP_200_OK)
+
+
+# Toggle the is_live field for a user's route view
+class ToggleIsLiveRouteView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, route_id):
+        user = request.user
+        try:
+            route = Route.objects.get(user=user, id=route_id)
+        except Route.DoesNotExist:
+            return Response({"error": "Route not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Toggle the is_live field
+        route.is_live = not route.is_live
+        route.save()
+
+        return Response({"message": "Route is_live field updated.", "is_live": route.is_live}, status=status.HTTP_200_OK)
+

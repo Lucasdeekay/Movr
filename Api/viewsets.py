@@ -1,7 +1,11 @@
 from rest_framework import viewsets
-from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink
+from rest_framework.permissions import IsAuthenticated
+
+from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
+    Route, ScheduledRoute, Day
 from .serializers import CustomUserSerializer, KYCSerializer, VehicleSerializer, PaymentMethodSerializer, \
-    SubscriptionPlanSerializer, SubscriptionSerializer, OTPSerializer, SocialMediaLinkSerializer
+    SubscriptionPlanSerializer, SubscriptionSerializer, OTPSerializer, SocialMediaLinkSerializer, RouteSerializer, \
+    ScheduledRouteSerializer, DaySerializer
 
 
 class CustomUserViewSet(viewsets.ModelViewSet):
@@ -35,6 +39,31 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
 class OTPViewSet(viewsets.ModelViewSet):
     queryset = OTP.objects.all()
     serializer_class = OTPSerializer
+
+class RouteViewSet(viewsets.ModelViewSet):
+    serializer_class = RouteSerializer
+    queryset = Route.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ScheduledRouteViewSet(viewsets.ModelViewSet):
+    serializer_class = ScheduledRouteSerializer
+    queryset = ScheduledRoute.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        route_data = serializer.validated_data['route']
+        route_data['user'] = self.request.user
+        serializer.save()
+
+
+class DayViewSet(viewsets.ModelViewSet):
+    serializer_class = DaySerializer
+    queryset = Day.objects.all()
+    permission_classes = [IsAuthenticated]
 
 
 
