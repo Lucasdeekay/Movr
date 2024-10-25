@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -10,6 +11,7 @@ from django_ratelimit.decorators import ratelimit
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
@@ -21,6 +23,22 @@ from .serializers import CustomUserSerializer, OTPVerificationSerializer, TokenS
     KYCSerializer, SocialMediaLinkSerializer, RouteSerializer, ScheduledRouteSerializer
 from rest_framework.authtoken.models import Token
 import random
+
+
+def get_user_from_token(request):
+    """
+    Extracts the user from the token in the Authorization header.
+
+    :param request: The current request object
+    :return: The user associated with the token
+    :raises: AuthenticationFailed if token is invalid or missing
+    """
+    token = request.headers.get('Authorization', '').split(' ')[1]
+    try:
+        token = Token.objects.get(key=token)
+        return token.user
+    except Token.DoesNotExist:
+        raise AuthenticationFailed('Invalid token')
 
 
 class RegisterView(APIView):
@@ -119,8 +137,9 @@ class LogoutView(APIView):
     def post(self, request):
         # Retrieve the token for the authenticated user
         try:
-            logout(request.user)
-            token = Token.objects.get(user=request.user)
+            user = get_user_from_token(request)
+            logout(user)
+            token = Token.objects.get(user=user)
             # Delete the token to log out the user
             token.delete()
             return Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
@@ -188,7 +207,7 @@ class UpdateKYCView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        user = request.user
+        user = get_user_from_token(request)
         data = request.data
 
         kyc, created = KYC.objects.get_or_create(user=user)
@@ -205,7 +224,7 @@ class UpdateVehicleInfoView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        user = request.user
+        user = get_user_from_token(request)
         data = request.data
 
         vehicle, created = Vehicle.objects.get_or_create(user=user)
@@ -213,7 +232,8 @@ class UpdateVehicleInfoView(APIView):
 
         if serializer.is_valid():
             serializer.save()
-            return Response({'message': 'Vehicle information updated successfully', 'vehicle': serializer.data}, status=status.HTTP_200_OK)
+            return Response({'message': 'Vehicle information updated successfully', 'vehicle': serializer.data},
+                            status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -222,7 +242,7 @@ class UpdatePersonalInfoView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        user = request.user
+        user = get_user_from_token(request)
         social_media, created = SocialMediaLink.objects.get_or_create(user=user)
 
         # Update user data (excluding email)
@@ -248,6 +268,7 @@ class UpdateSubscriptionPlanView(APIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request, *args, **kwargs):
+        user = get_user_from_token(request)
         plan_name = request.data.get('plan_name')
 
         if not plan_name:
@@ -258,7 +279,7 @@ class UpdateSubscriptionPlanView(APIView):
         except SubscriptionPlan.DoesNotExist:
             return Response({"error": "Subscription plan not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        subscription, created = Subscription.objects.get_or_create(user=request.user)
+        subscription, created = Subscription.objects.get_or_create(user=user)
 
         # Calculate new end date based on the duration of the plan
         subscription.plan = plan
@@ -276,7 +297,7 @@ class CreateRouteView(APIView):
 
     def post(self, request):
         # Collect fields from the request
-        user = request.user
+        user = get_user_from_token(request)
         location = request.data.get('location')
         destination = request.data.get('destination')
         stop_location = request.data.get('stop_location', None)
@@ -287,7 +308,8 @@ class CreateRouteView(APIView):
 
         # Validate required fields
         if not location or not destination or not transportation_mode or not departure_time:
-            return Response({"error": "Location, destination, transportation mode, and departure time are required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Location, destination, transportation mode, and departure time are required."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         # Create and save the Route instance
         route = Route.objects.create(
@@ -303,7 +325,8 @@ class CreateRouteView(APIView):
 
         serializer = RouteSerializer(route)
 
-        return Response({"message": "Route created successfully.", "route": serializer.data}, status=status.HTTP_201_CREATED)
+        return Response({"message": "Route created successfully.", "route": serializer.data},
+                        status=status.HTTP_201_CREATED)
 
 
 # Create Scheduled Route View
@@ -313,7 +336,7 @@ class CreateScheduledRouteView(APIView):
 
     def post(self, request):
         # Collect fields for the associated Route
-        user = request.user
+        user = get_user_from_token(request)
         location = request.data.get('location')
         destination = request.data.get('destination')
         stop_location = request.data.get('stop_location', None)
@@ -324,7 +347,8 @@ class CreateScheduledRouteView(APIView):
 
         # Validate required fields for the Route
         if not location or not destination or not transportation_mode or not departure_time:
-            return Response({"error": "Location, destination, transportation mode, and departure time are required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Location, destination, transportation mode, and departure time are required."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         # Create the Route instance
         route = Route.objects.create(
@@ -346,7 +370,8 @@ class CreateScheduledRouteView(APIView):
 
         # Validate schedule fields
         if is_repeated and not days_of_week_ids:
-            return Response({"error": "Days of week must be provided if the route is repeated."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Days of week must be provided if the route is repeated."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         # Create the ScheduledRoute instance
         scheduled_route = ScheduledRoute.objects.create(
@@ -363,7 +388,8 @@ class CreateScheduledRouteView(APIView):
 
         serializer = ScheduledRouteSerializer(scheduled_route)
 
-        return Response({"message": "Scheduled Route created successfully.", "scheduled_route": serializer.data}, status=status.HTTP_201_CREATED)
+        return Response({"message": "Scheduled Route created successfully.", "scheduled_route": serializer.data},
+                        status=status.HTTP_201_CREATED)
 
 
 # Get all user routes view
@@ -372,7 +398,7 @@ class UserRoutesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
+        user = get_user_from_token(request)
         routes = Route.objects.filter(user=user)
         serializer = RouteSerializer(routes, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -384,7 +410,7 @@ class TotalLiveRoutesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
+        user = get_user_from_token(request)
         live_routes_count = Route.objects.filter(user=user, is_live=True).count()
         return Response({"live_routes_count": live_routes_count}, status=status.HTTP_200_OK)
 
@@ -395,7 +421,7 @@ class ToggleIsLiveRouteView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, route_id):
-        user = request.user
+        user = get_user_from_token(request)
         try:
             route = Route.objects.get(user=user, id=route_id)
         except Route.DoesNotExist:
@@ -405,5 +431,5 @@ class ToggleIsLiveRouteView(APIView):
         route.is_live = not route.is_live
         route.save()
 
-        return Response({"message": "Route is_live field updated.", "is_live": route.is_live}, status=status.HTTP_200_OK)
-
+        return Response({"message": "Route is_live field updated.", "is_live": route.is_live},
+                        status=status.HTTP_200_OK)
