@@ -2,18 +2,20 @@ from datetime import timedelta
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.tokens import default_token_generator
-from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django_ratelimit.decorators import ratelimit
+from django.core.mail import send_mail
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-from django_ratelimit.decorators import ratelimit
-from django.core.mail import send_mail
+from .models import Route, ScheduledRoute, Day
 from .models import CustomUser, KYC, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink
 from .serializers import CustomUserSerializer, OTPVerificationSerializer, TokenSerializer, VehicleSerializer, \
     KYCSerializer, SocialMediaLinkSerializer, RouteSerializer, ScheduledRouteSerializer
@@ -266,15 +268,6 @@ class UpdateSubscriptionPlanView(APIView):
 
         return Response({"message": "Subscription plan updated successfully."}, status=status.HTTP_200_OK)
 
-
-from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
-from .models import Route, ScheduledRoute, Day
 
 # Create Route View
 class CreateRouteView(APIView):

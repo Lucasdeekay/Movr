@@ -32,9 +32,9 @@ class UserManager(BaseUserManager):
 # Custom User Model
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
-    first_name = models.CharField(max_length=50)
-    last_name = models.CharField(max_length=50)
-    phone_number = models.CharField(max_length=15, unique=True)
+    first_name = models.CharField(max_length=50, null=True, blank=True)
+    last_name = models.CharField(max_length=50, null=True, blank=True)
+    phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
     is_email_verified = models.BooleanField(default=False)
     profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True)
     two_factor_enabled = models.BooleanField(default=False)
