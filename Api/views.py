@@ -42,9 +42,29 @@ def get_user_from_token(request):
 
 
 class RegisterView(APIView):
+    """
+    API view for user registration.
+
+    This view handles the registration of a new user. It validates the incoming data,
+    creates a new user, initializes associated KYC, Vehicle, and Subscription objects,
+    and sends an OTP for email verification. Rate limiting is applied to restrict
+    the number of registration attempts from the same IP address.
+    """
+
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     def post(self, request, *args, **kwargs):
+        """
+        Handle POST requests for user registration.
+
+        Args:
+            request: The HTTP request object containing the registration data.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Response: A Response object containing the serialized user data or error messages.
+        """
         serializer = CustomUserSerializer(data=request.data)
         if serializer.is_valid():
             try:
@@ -68,16 +88,38 @@ class RegisterView(APIView):
                 return Response(CustomUserSerializer(user).data, status=status.HTTP_200_OK)
             except Exception as e:
                 return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class VerifyOTPView(APIView):
+    """
+    API view for verifying One-Time Password (OTP) for email verification.
+
+    This view handles the verification of an OTP sent to a user's email.
+    It checks if the provided OTP is valid, not used, and not expired.
+    If the OTP is valid, it marks it as used and updates the user's email verification status.
+    Rate limiting is applied to restrict the number of verification attempts from the same IP address.
+    """
+
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     def post(self, request, *args, **kwargs):
+        """
+        Handle POST requests for OTP verification.
+
+        Args:
+            request: The HTTP request object containing the OTP verification data.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Response: A Response object indicating the result of the OTP verification.
+        """
         serializer = OTPVerificationSerializer(data=request.data)
         if serializer.is_valid():
             try:
+                # Retrieve the OTP object based on the user's email and provided code
                 otp = OTP.objects.get(
                     user__email=serializer.validated_data['email'],
                     code=serializer.validated_data['code']
@@ -85,13 +127,15 @@ class VerifyOTPView(APIView):
             except OTP.DoesNotExist:
                 return Response({'error': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
 
+            # Check if the OTP has already been used
             if otp.is_used:
                 return Response({'error': 'OTP has already been used'}, status=status.HTTP_400_BAD_REQUEST)
 
+            # Check if the OTP has expired
             if otp.is_expired():
                 return Response({'error': 'OTP has expired'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Mark OTP as used and verify user
+            # Mark the OTP as used and verify the user's email
             otp.is_used = True
             otp.user.is_email_verified = True
             otp.user.save()
@@ -103,9 +147,29 @@ class VerifyOTPView(APIView):
 
 
 class LoginView(APIView):
+    """
+    API view for user login.
+
+    This view handles user authentication by verifying the provided email and password.
+    If the credentials are valid and the user's email is verified, a token is generated
+    for the user, and their information is returned in the response. Rate limiting is applied
+    to restrict the number of login attempts from the same IP address.
+    """
+
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     def post(self, request, *args, **kwargs):
+        """
+        Handle POST requests for user login.
+
+        Args:
+            request: The HTTP request object containing the login data.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Response: A Response object containing the user's token and information, or an error message.
+        """
         email = request.data.get('email')
         password = request.data.get('password')
 
@@ -118,10 +182,8 @@ class LoginView(APIView):
         if user is not None:
             if not user.is_email_verified:
                 return Response({'error': 'Email is not verified'}, status=status.HTTP_400_BAD_REQUEST)
-
             login(request, user)
             token, _ = Token.objects.get_or_create(user=user)
-
             return Response({
                 'token': TokenSerializer(token).data,
                 'user': CustomUserSerializer(user).data,
@@ -131,15 +193,32 @@ class LoginView(APIView):
 
 
 class LogoutView(APIView):
+    """
+    API view for user logout.
+
+    This view handles the logout process for authenticated users.
+    It retrieves the user's token, logs them out, and deletes the token
+    to ensure the user is logged out successfully.
+    """
+
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        """
+        Handle POST requests for user logout.
+
+        Args:
+            request: The HTTP request object containing the user's authentication token.
+
+        Returns:
+            Response: A Response object indicating the result of the logout process.
+        """
         # Retrieve the token for the authenticated user
         try:
-            user = get_user_from_token(request)
-            logout(user)
-            token = Token.objects.get(user=user)
+            user = get_user_from_token(request)  # Function to retrieve user from token
+            logout(user)  # Log out the user
+            token = Token.objects.get(user=user)  # Get the user's token
             # Delete the token to log out the user
             token.delete()
             return Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
@@ -148,11 +227,29 @@ class LogoutView(APIView):
 
 
 class ForgotPasswordRequestOTPView(APIView):
+    """
+    API view for requesting a password reset OTP.
+
+    This view handles the process of generating a password reset token
+    and sending a reset link to the user's registered email address.
+    Rate limiting is applied to restrict the number of requests from the same IP address.
+    """
+
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     def post(self, request, *args, **kwargs):
+        """
+        Handle POST requests for requesting a password reset OTP.
+
+        Args:
+            request: The HTTP request object containing the user's email.
+
+        Returns:
+            Response: A Response object indicating the result of the password reset request.
+        """
         email = request.data.get('email')
 
+        # Check if the user exists
         try:
             user = CustomUser.objects.get(email=email)
         except CustomUser.DoesNotExist:
@@ -167,25 +264,53 @@ class ForgotPasswordRequestOTPView(APIView):
 
         # Send an email with the reset link
         subject = "Password Reset Request"
-        message = f"Hello {user.first_name},\n\nClick the link below to reset your password:\n\n{reset_link}\n\nIf you did not request a password reset, please ignore this email."
+        message = (
+            f"Hello {user.first_name},\n\n"
+            f"Click the link below to reset your password:\n\n"
+            f"{reset_link}\n\n"
+            "If you did not request a password reset, please ignore this email."
+        )
         send_mail(subject, message, 'no-reply@yourapp.com', [user.email])
 
         return Response({'message': 'Password reset link sent to email'}, status=status.HTTP_200_OK)
 
 
 class ResetPasswordView(APIView):
+    """
+    API view for resetting a user's password.
+
+    This view handles the process of resetting a user's password
+    using a valid password reset token. It verifies the token and
+    user ID, and updates the password if the token is valid.
+    Rate limiting is applied to restrict the number of requests
+    from the same IP address.
+    """
+
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     def post(self, request, *args, **kwargs):
+        """
+        Handle POST requests for resetting a password.
+
+        Args:
+            request: The HTTP request object containing the user's ID,
+                     token, and new password information.
+
+        Returns:
+            Response: A Response object indicating the result of the
+                      password reset process.
+        """
         uid = request.data.get('uid')
         token = request.data.get('token')
         new_password = request.data.get('new_password')
         confirm_password = request.data.get('confirm_password')
 
+        # Check if the new password and confirm password match
         if new_password != confirm_password:
             return Response({'error': 'Passwords do not match'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            # Decode the user ID
             uid = urlsafe_base64_decode(uid).decode()
             user = CustomUser.objects.get(pk=uid)
         except (TypeError, ValueError, OverflowError, CustomUser.DoesNotExist):
@@ -203,46 +328,114 @@ class ResetPasswordView(APIView):
 
 
 class UpdateKYCView(APIView):
+    """
+    API view for updating the user's KYC (Know Your Customer) information.
+
+    This view allows authenticated users to update their KYC details.
+    If no KYC record exists for the user, a new one is created.
+    The view utilizes token-based authentication to ensure that only
+    authenticated users can access this endpoint.
+    """
+
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        user = get_user_from_token(request)
-        data = request.data
+        """
+        Handle POST requests for updating KYC information.
 
+        Args:
+            request: The HTTP request object containing the KYC data to be updated.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Response: A Response object indicating the result of the KYC update process.
+        """
+        user = get_user_from_token(request)  # Retrieve the authenticated user
+        data = request.data  # Get the KYC data from the request
+
+        # Get or create a KYC record for the user
         kyc, created = KYC.objects.get_or_create(user=user)
+
+        # Initialize the serializer with the existing KYC data and the new data
         serializer = KYCSerializer(kyc, data=data, partial=True)
 
         if serializer.is_valid():
-            serializer.save()
+            serializer.save()  # Save the updated KYC data
             return Response({'message': 'KYC updated successfully', 'kyc': serializer.data}, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)  # Return validation errors if any
 
 
 class UpdateVehicleInfoView(APIView):
+    """
+    API view for updating the user's vehicle information.
+
+    This view allows authenticated users to update their vehicle details.
+    If no vehicle record exists for the user, a new one is created.
+    The view utilizes token-based authentication to ensure that only
+    authenticated users can access this endpoint.
+    """
+
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        user = get_user_from_token(request)
-        data = request.data
+        """
+        Handle POST requests for updating vehicle information.
 
+        Args:
+            request: The HTTP request object containing the vehicle data to be updated.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Response: A Response object indicating the result of the vehicle update process.
+        """
+        user = get_user_from_token(request)  # Retrieve the authenticated user
+        data = request.data  # Get the vehicle data from the request
+
+        # Get or create a vehicle record for the user
         vehicle, created = Vehicle.objects.get_or_create(user=user)
+
+        # Initialize the serializer with the existing vehicle data and the new data
         serializer = VehicleSerializer(vehicle, data=data, partial=True)
 
         if serializer.is_valid():
-            serializer.save()
+            serializer.save()  # Save the updated vehicle data
             return Response({'message': 'Vehicle information updated successfully', 'vehicle': serializer.data},
                             status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)  # Return validation errors if any
 
 
 class UpdatePersonalInfoView(APIView):
+    """
+    API view for updating a user's personal information and social media links.
+
+    This view allows authenticated users to update their personal information
+    (excluding email) and their social media links. The view utilizes token-based
+    authentication to ensure that only authenticated users can access this endpoint.
+    """
+
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        user = get_user_from_token(request)
+        """
+        Handle POST requests for updating personal information.
+
+        Args:
+            request: The HTTP request object containing the user data and social media links to be updated.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Response: A Response object containing the updated user and social media data,
+                      or error messages if validation fails.
+        """
+        user = get_user_from_token(request)  # Retrieve the authenticated user
         social_media, created = SocialMediaLink.objects.get_or_create(user=user)
 
         # Update user data (excluding email)
@@ -250,8 +443,8 @@ class UpdatePersonalInfoView(APIView):
         social_media_serializer = SocialMediaLinkSerializer(social_media, data=request.data, partial=True)
 
         if user_serializer.is_valid() and social_media_serializer.is_valid():
-            user_serializer.save()
-            social_media_serializer.save()
+            user_serializer.save()  # Save the updated user information
+            social_media_serializer.save()  # Save the updated social media links
             return Response({
                 'user': user_serializer.data,
                 'social_media': social_media_serializer.data
@@ -260,44 +453,82 @@ class UpdatePersonalInfoView(APIView):
         return Response({
             'user_errors': user_serializer.errors,
             'social_media_errors': social_media_serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
+        }, status=status.HTTP_400_BAD_REQUEST)  # Return validation errors if any
 
 
 class UpdateSubscriptionPlanView(APIView):
+    """
+    API view for updating a user's subscription plan.
+
+    This view allows authenticated users to update their subscription plan
+    based on the provided plan name. The view utilizes token-based
+    authentication to ensure that only authenticated users can access this endpoint.
+    """
+
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def put(self, request, *args, **kwargs):
-        user = get_user_from_token(request)
-        plan_name = request.data.get('plan_name')
+        """
+        Handle PUT requests for updating the subscription plan.
+
+        Args:
+            request: The HTTP request object containing the new subscription plan name.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Response: A Response object indicating the result of the subscription plan update process.
+        """
+        user = get_user_from_token(request)  # Retrieve the authenticated user
+        plan_name = request.data.get('plan_name')  # Get the plan name from the request data
 
         if not plan_name:
             return Response({"error": "Plan name is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            # Retrieve the subscription plan by name
             plan = SubscriptionPlan.objects.get(name=plan_name.lower())
         except SubscriptionPlan.DoesNotExist:
             return Response({"error": "Subscription plan not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Get or create a subscription record for the user
         subscription, created = Subscription.objects.get_or_create(user=user)
 
         # Calculate new end date based on the duration of the plan
         subscription.plan = plan
         subscription.start_date = timezone.now()
         subscription.end_date = subscription.start_date + timedelta(days=plan.duration)
-        subscription.save()
+        subscription.save()  # Save the updated subscription information
 
         return Response({"message": "Subscription plan updated successfully."}, status=status.HTTP_200_OK)
 
 
-# Create Route View
 class CreateRouteView(APIView):
+    """
+    API view for creating a new route.
+
+    This view allows authenticated users to create a new route by providing
+    the necessary details such as location, destination, transportation mode,
+    and departure time. The view utilizes token-based authentication to ensure
+    that only authenticated users can access this endpoint.
+    """
+
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        """
+        Handle POST requests for creating a new route.
+
+        Args:
+            request: The HTTP request object containing the route details.
+
+        Returns:
+            Response: A Response object indicating the result of the route creation process.
+        """
         # Collect fields from the request
-        user = get_user_from_token(request)
+        user = get_user_from_token(request)  # Retrieve the authenticated user
         location = request.data.get('location')
         destination = request.data.get('destination')
         stop_location = request.data.get('stop_location', None)
@@ -322,19 +553,36 @@ class CreateRouteView(APIView):
             departure_time=departure_time,
             ticket_image=ticket_image,
         )
-
-        serializer = RouteSerializer(route)
-
+        serializer = RouteSerializer(route)  # Serialize the created route instance
         return Response({"message": "Route created successfully.", "route": serializer.data},
                         status=status.HTTP_201_CREATED)
 
 
-# Create Scheduled Route View
 class CreateScheduledRouteView(APIView):
+    """
+    API view for creating a scheduled route.
+
+    This view allows authenticated users to create a scheduled route by providing
+    necessary details such as location, destination, transportation mode, and schedule
+    information. The view utilizes token-based authentication to ensure that only
+    authenticated users can access this endpoint.
+    """
+
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        """
+        Handle POST requests for creating a scheduled route.
+
+        Args:
+            request: The HTTP request object containing the route and schedule details.
+
+        Returns:
+            Response: A Response object indicating the result of the scheduled route creation process.
+                      It includes a success message and the serialized scheduled route data if successful,
+                      or an error message if validation fails.
+        """
         # Collect fields for the associated Route
         user = get_user_from_token(request)
         location = request.data.get('location')
@@ -392,35 +640,55 @@ class CreateScheduledRouteView(APIView):
                         status=status.HTTP_201_CREATED)
 
 
-# Get all user routes view
 class UserRoutesView(APIView):
+    """
+    API view for retrieving a user's routes.
+
+    This view allows authenticated users to retrieve all routes associated with their account.
+    It utilizes token-based authentication to ensure that only authenticated users can access this endpoint.
+    """
+
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        """
+        Handle GET requests to retrieve the user's routes.
+
+        Args:
+            request: The HTTP request object containing the user's authentication token.
+
+        Returns:
+            Response: A Response object containing the serialized route data for the authenticated user,
+                      with a status code of 200 (OK).
+        """
         user = get_user_from_token(request)
         routes = Route.objects.filter(user=user)
         serializer = RouteSerializer(routes, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-# Get total number of live routes view
-class TotalLiveRoutesView(APIView):
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        user = get_user_from_token(request)
-        live_routes_count = Route.objects.filter(user=user, is_live=True).count()
-        return Response({"live_routes_count": live_routes_count}, status=status.HTTP_200_OK)
-
-
-# Toggle the is_live field for a user's route view
 class ToggleIsLiveRouteView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, route_id):
+        """
+        Toggle the 'is_live' status of a user's route.
+
+        This method allows an authenticated user to toggle the 'is_live' status
+        of a specific route identified by its ID. If the route is currently live,
+        it will be set to not live, and vice versa.
+
+        Args:
+            request: The HTTP request object containing the user's authentication token.
+            route_id: The ID of the route to be toggled.
+
+        Returns:
+            Response: A Response object containing a message indicating the result
+                      of the toggle operation and the new 'is_live' status of the route.
+                      If the route is not found, a 404 error response is returned.
+        """
         user = get_user_from_token(request)
         try:
             route = Route.objects.get(user=user, id=route_id)

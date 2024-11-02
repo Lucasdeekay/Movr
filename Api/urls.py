@@ -12,7 +12,7 @@ from .views import (
     LogoutView,
     ForgotPasswordRequestOTPView,
     ResetPasswordView, UpdateKYCView, UpdateVehicleInfoView, UpdatePersonalInfoView, UpdateSubscriptionPlanView,
-    CreateRouteView, CreateScheduledRouteView, UserRoutesView, TotalLiveRoutesView, ToggleIsLiveRouteView
+    CreateRouteView, CreateScheduledRouteView, UserRoutesView, ToggleIsLiveRouteView
 )
 
 # Initialize the router
@@ -46,7 +46,6 @@ urlpatterns = [
     path('create-route/', CreateRouteView.as_view(), name='create-route'),
     path('create-scheduled-route/', CreateScheduledRouteView.as_view(), name='create-scheduled-route'),
     path('user-routes/', UserRoutesView.as_view(), name='user-routes'),
-    path('total-live-routes/', TotalLiveRoutesView.as_view(), name='total-live-routes'),
     path('toggle-is-live/<int:route_id>/', ToggleIsLiveRouteView.as_view(), name='toggle-is-live'),
     path('api/', include(router.urls)),
 ]
