@@ -2,7 +2,13 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth.models import AnonymousUser
 from rest_framework.authtoken.models import Token
 import json
-from .models import Route
+from .models import Route, CustomUser
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from .models import Package
 
 '''
 void connectToWebSocket(String token) {
@@ -92,3 +98,50 @@ class TotalLiveRoutesConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'live_routes_count': count
         }))
+
+
+class NotificationConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.user = self.scope["user"]
+        if self.user.is_authenticated:
+            # Group name based on user ID or role
+            self.group_name = f"movers_{self.user.id}"
+            await self.channel_layer.group_add(
+                self.group_name,
+                self.channel_name
+            )
+            await self.accept()
+        else:
+            await self.close()
+
+    async def disconnect(self, close_code):
+        if self.user.is_authenticated:
+            await self.channel_layer.group_discard(
+                self.group_name,
+                self.channel_name
+            )
+
+    async def send_notification(self, event):
+        await self.send(text_data=json.dumps(event["content"]))
+
+
+@receiver(post_save, sender=Package)
+def notify_movers(sender, instance, created, **kwargs):
+    if created:
+        # Fetch movers within the specified range
+        movers = CustomUser.objects.filter(...)  # Add logic to filter based on range
+        channel_layer = get_channel_layer()
+
+        for mover in movers:
+            async_to_sync(channel_layer.group_send)(
+                f"movers_{mover.id}",
+                {
+                    "type": "send_notification",
+                    "content": {
+                        "message": f"New package request from {instance.user.email} to {instance.destination}.",
+                        "package_id": instance.id,
+                        "location": instance.location,
+                        "destination": instance.destination,
+                    },
+                },
+            )

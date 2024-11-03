@@ -1,20 +1,10 @@
 from django.urls import path
-from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
 from .consumers import (
-    TotalLiveRoutesConsumer,
+    TotalLiveRoutesConsumer, NotificationConsumer,
 )
 
-application = ProtocolTypeRouter({
-    # HTTP requests
-    'http': URLRouter([
+websocket_urlpatterns = [
+    path('ws/live-routes/', TotalLiveRoutesConsumer.as_asgi()),
+    path('ws/notifications/', NotificationConsumer.as_asgi()),
+]
 
-    ]),
-
-    # WebSocket requests
-    'websocket': AuthMiddlewareStack(
-        URLRouter([
-            path('ws/live-routes/', TotalLiveRoutesConsumer.as_asgi()),
-        ])
-    ),
-})

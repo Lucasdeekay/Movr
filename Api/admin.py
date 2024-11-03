@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day
+    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer
 
 
 @admin.register(CustomUser)
@@ -69,6 +69,30 @@ class DayAdmin(admin.ModelAdmin):
     list_display = ('name',)
     search_fields = ('name',)
     ordering = ('name',)
+
+
+@admin.register(Package)
+class PackageAdmin(admin.ModelAdmin):
+    list_display = ('user', 'location', 'destination', 'item_weight', 'range_radius')
+    search_fields = ('user__email', 'location', 'destination')
+    list_filter = ('item_weight', 'range_radius')
+
+@admin.register(Bid)
+class BidAdmin(admin.ModelAdmin):
+    list_display = ('package', 'mover', 'price', 'created_at')
+    search_fields = ('mover__email', 'package__location', 'package__destination')
+    list_filter = ('created_at',)
+
+@admin.register(QRCode)
+class QRCodeAdmin(admin.ModelAdmin):
+    list_display = ('code',)
+    search_fields = ('code',)
+
+@admin.register(PackageOffer)
+class PackageOfferAdmin(admin.ModelAdmin):
+    list_display = ('package_bid', 'qr_code', 'is_picked_up', 'is_delivered')
+    search_fields = ('package_bid__package__location', 'package_bid__package__destination', 'is_picked_up', 'is_delivered')
+
 
 
 

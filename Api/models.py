@@ -7,6 +7,9 @@ from django.core.mail import send_mail
 from django.db import models
 from django.contrib.auth.models import PermissionsMixin
 from django.utils import timezone
+import qrcode
+from io import BytesIO
+from django.core.files import File
 
 from Movr import settings
 
@@ -215,22 +218,79 @@ class ScheduledRoute(models.Model):
     def __str__(self):
         return f"Scheduled Route for {self.route.user.email} from {self.route.location} to {self.route.destination}"
 
+class Package(models.Model):
+    WEIGHT_CHOICES = [
+        ('light', 'Light'),
+        ('medium', 'Medium'),
+        ('heavy', 'Heavy'),
+    ]
+    PACKAGE_TYPE = [
+        ('Delivery', 'Delivery'),
+        ('Rideshare', 'Rideshare'),
+        ('Schedule', 'Schedule'),
+    ]
 
-#
-# # Trip Sharing and Ride-Hailing Models
-# class TravelPlan(models.Model):
-#     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='travel_plans')
-#     route = models.CharField(max_length=255)
-#     departure_time = models.DateTimeField()
-#     vehicle_type = models.CharField(max_length=50)
-#     package_delivery = models.BooleanField(default=False)
-#     package_details = models.TextField(null=True, blank=True)
-#     insurance_coverage = models.BooleanField(default=False)
-#     created_at = models.DateTimeField(auto_now_add=True)
-#
-#     def __str__(self):
-#         return f"{self.user.username} - {self.route}"
-#
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='packages')
+    location = models.CharField(max_length=255)
+    destination = models.CharField(max_length=255)
+    package_type = models.CharField(max_length=20, choices=PACKAGE_TYPE)
+    item_image = models.ImageField(upload_to='package_images/', null=True, blank=True)
+    item_description = models.TextField(null=True, blank=True)
+    item_weight = models.CharField(max_length=10, null=True, blank=True, choices=WEIGHT_CHOICES)
+    receiver_name = models.CharField(null=True, blank=True, max_length=100)
+    receiver_phone_number = models.CharField(null=True, blank=True, max_length=15)
+    range_radius = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Radius in km")
+
+    def __str__(self):
+        return f"Package from {self.location} to {self.destination} by {self.user.email}"
+
+# Bid Model
+class Bid(models.Model):
+    package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name='bids')
+    mover = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='bids')
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Bid by {self.mover.email} for {self.price}"
+
+# QR Code Model
+class QRCode(models.Model):
+    code = models.CharField(max_length=6, unique=True)
+    qr_image = models.ImageField(upload_to='qr_codes/', null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = ''.join(random.choices(string.digits, k=6))
+
+        # Generate QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(self.code)
+        qr.make(fit=True)
+        img = qr.make_image(fill='black', back_color='white')
+
+        # Save the QR code image
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        self.qr_image.save(f'{self.package.id}_qr.png', File(buffer), save=False)
+        super().save(*args, **kwargs)
+
+
+class PackageOffer(models.Model):
+    package_bid = models.ForeignKey(Bid, on_delete=models.CASCADE, related_name='package_offers')
+    qr_code = models.ForeignKey(QRCode, on_delete=models.CASCADE, related_name='package_offers')
+    is_picked_up = models.BooleanField(default=False)
+    is_delivered = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Package Offer for {self.package_bid.package.location} to {self.package_bid.package.destination}"
+
+
 # class RideMatch(models.Model):
 #     travel_plan = models.ForeignKey(TravelPlan, on_delete=models.CASCADE, related_name='matches')
 #     matched_user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='matches')

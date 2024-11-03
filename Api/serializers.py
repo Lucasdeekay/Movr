@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
 from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day
+    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer
 
 
 class TokenSerializer(serializers.ModelSerializer):
@@ -105,6 +105,36 @@ class DaySerializer(serializers.ModelSerializer):
     class Meta:
         model = Day
         fields = '__all__'
+
+class PackageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Package
+        fields = '__all__'
+
+class BidSerializer(serializers.ModelSerializer):
+    mover_details = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Bid
+        fields = ['id', 'price', 'mover_details', 'created_at']
+
+    def get_mover_details(self, obj):
+        return {
+            "name": f"{obj.mover.first_name} {obj.mover.last_name}",
+            "email": obj.mover.email,
+        }
+
+class QRCodeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QRCode
+        fields = '__all__'
+
+
+class PackageOfferSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PackageOffer
+        fields = '__all__'
+
 
 
 

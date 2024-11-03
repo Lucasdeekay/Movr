@@ -12,7 +12,9 @@ from .views import (
     LogoutView,
     ForgotPasswordRequestOTPView,
     ResetPasswordView, UpdateKYCView, UpdateVehicleInfoView, UpdatePersonalInfoView, UpdateSubscriptionPlanView,
-    CreateRouteView, CreateScheduledRouteView, UserRoutesView, ToggleIsLiveRouteView
+    CreateRouteView, CreateScheduledRouteView, UserRoutesView, ToggleIsLiveRouteView, PackageSubmissionView,
+    PlaceBidView, PickupConfirmationView, DeliveryConfirmationView, SelectMoverView, GetAllBidsView, GetBidDetailView,
+    GetPackageOfferDetailView
 )
 
 # Initialize the router
@@ -47,5 +49,13 @@ urlpatterns = [
     path('create-scheduled-route/', CreateScheduledRouteView.as_view(), name='create-scheduled-route'),
     path('user-routes/', UserRoutesView.as_view(), name='user-routes'),
     path('toggle-is-live/<int:route_id>/', ToggleIsLiveRouteView.as_view(), name='toggle-is-live'),
+    path('submit-package/', PackageSubmissionView.as_view(), name='submit-package'),
+    path('place-bid/<int:package_id>/', PlaceBidView.as_view(), name='place-bid'),
+    path('package/<int:package_id>/bids/', GetAllBidsView.as_view(), name='get-all-bids'),
+    path('bid/<int:bid_id>/', GetBidDetailView.as_view(), name='get-bid-detail'),
+    path('select-mover/<int:bid_id>/', SelectMoverView.as_view(), name='select-mover'),
+    path('confirm-pickup/<int:package_offer_id>/', PickupConfirmationView.as_view(), name='confirm-pickup'),
+    path('confirm-delivery/<int:package_offer_id>/', DeliveryConfirmationView.as_view(), name='confirm-delivery'),
+    path('package-offer/<int:package_offer_id>/', GetPackageOfferDetailView.as_view(), name='get-package-offer-detail'),
     path('api/', include(router.urls)),
 ]

@@ -17,10 +17,11 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from .models import Route, ScheduledRoute, Day
+from .models import Route, ScheduledRoute, Day, Package, Bid, PackageOffer, QRCode
 from .models import CustomUser, KYC, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink
 from .serializers import CustomUserSerializer, OTPVerificationSerializer, TokenSerializer, VehicleSerializer, \
-    KYCSerializer, SocialMediaLinkSerializer, RouteSerializer, ScheduledRouteSerializer
+    KYCSerializer, SocialMediaLinkSerializer, RouteSerializer, ScheduledRouteSerializer, PackageSerializer, \
+    BidSerializer, PackageOfferSerializer
 from rest_framework.authtoken.models import Token
 import random
 
@@ -78,7 +79,7 @@ class RegisterView(APIView):
                 # Create default KYC, Vehicle, and free Subscription
                 KYC.objects.create(user=user)
                 Vehicle.objects.create(user=user)
-                free_plan = SubscriptionPlan.objects.get(name="Free")
+                free_plan, _ = SubscriptionPlan.objects.get_or_create(name="free")
                 Subscription.objects.create(user=user, plan=free_plan)
 
                 # Generate and send OTP for email verification
@@ -701,3 +702,160 @@ class ToggleIsLiveRouteView(APIView):
 
         return Response({"message": "Route is_live field updated.", "is_live": route.is_live},
                         status=status.HTTP_200_OK)
+
+
+class PackageSubmissionView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = PackageSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PlaceBidView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, package_id):
+        mover = get_user_from_token(request)
+        price = request.data.get('price')
+
+        if not price:
+            return Response({"error": "Price is required to place a bid."}, status=400)
+
+        package = Package.objects.get(id=package_id)
+
+        # Create a new bid
+        bid = Bid.objects.create(
+            package=package,
+            mover=mover,
+            price=price
+        )
+
+        return Response({"message": "Bid placed successfully.", "bid_id": bid.id}, status=201)
+
+
+class GetAllBidsView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, package_id):
+        try:
+            # Retrieve the package
+            package = Package.objects.get(id=package_id)
+
+            # Ensure the user requesting the bids is the owner of the package
+            if package.user != request.user:
+                return Response({"error": "You are not authorized to view the bids for this package."}, status=403)
+
+            # Retrieve all bids associated with this package
+            bids = Bid.objects.filter(package=package)
+
+            # Serialize the bid data
+            serializer = BidSerializer(bids, many=True)
+            return Response(serializer.data, status=200)
+
+        except Package.DoesNotExist:
+            return Response({"error": "Package not found."}, status=404)
+
+
+class GetBidDetailView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, bid_id):
+        try:
+            user = get_user_from_token(request)
+            # Retrieve the bid using the bid_id
+            bid = Bid.objects.get(id=bid_id)
+
+            # Ensure the user requesting the bid details is either the owner of the package or the mover who made the bid
+            if bid.package.user != user and bid.mover != user:
+                return Response({"error": "You are not authorized to view this bid."}, status=403)
+
+            # Serialize the bid data
+            serializer = BidSerializer(bid)
+            return Response(serializer.data, status=200)
+
+        except Bid.DoesNotExist:
+            return Response({"error": "Bid not found."}, status=404)
+
+
+class SelectMoverView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, bid_id):
+        try:
+            user = get_user_from_token(request)
+            # Retrieve the bid using the bid_id
+            bid = Bid.objects.get(id=bid_id)
+
+            # Ensure the user requesting the bid details is either the owner of the package or the mover who made the bid
+            if bid.package.user != user and bid.mover != user:
+                return Response({"error": "You are not authorized to view this bid."}, status=403)
+
+            qr_code = QRCode()
+            qr_code.save()
+            PackageOffer.objects.create(package_bid=bid, qr_code=qr_code)
+
+            return Response({"message": f"{bid.mover.email} has been selected for the delivery."},
+                            status=200)
+
+        except Bid.DoesNotExist:
+            return Response({"error": "Bid not found."}, status=404)
+
+
+class GetPackageOfferDetailView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, package_offer_id):
+        try:
+            # Retrieve the package offer using the package_offer_id
+            package_offer = PackageOffer.objects.get(id=package_offer_id)
+
+            # Serialize the package offer data
+            serializer = PackageOfferSerializer(package_offer)
+            return Response(serializer.data, status=200)
+
+        except PackageOffer.DoesNotExist:
+            return Response({"error": "Package offer not found."}, status=404)
+
+
+class PickupConfirmationView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, package_offer_id):
+        package_offer = PackageOffer.objects.get(id=package_offer_id)
+        code = request.data.get('code')
+
+        if package_offer.qr_code.code == code:
+            # Confirm pickup
+            package_offer.is_picked_up = True
+            package_offer.save()
+            return Response({"message": "Pickup confirmed."}, status=200)
+        else:
+            return Response({"error": "Invalid code."}, status=400)
+
+
+class DeliveryConfirmationView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, package_offer_id):
+        package_offer = PackageOffer.objects.get(id=package_offer_id)
+        code = request.data.get('code')
+
+        if package_offer.qr_code.code == code:
+            # Confirm delivery
+            package_offer.is_delivered = True
+            package_offer.save()
+            return Response({"message": "Delivery confirmed."}, status=200)
+        else:
+            return Response({"error": "Invalid code."}, status=400)
