@@ -28,7 +28,7 @@ schema_view = get_schema_view(
         default_version='v1',
         description="Movr API",
         terms_of_service="https://www.google.com/policies/terms/",
-        contact=openapi.Contact(email="contact@easeappapi.local"),
+        contact=openapi.Contact(email="contact@movrapi.local"),
         license=openapi.License(name="MIT License"),
     ),
     public=True,

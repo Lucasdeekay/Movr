@@ -531,12 +531,19 @@ class CreateRouteView(APIView):
         # Collect fields from the request
         user = get_user_from_token(request)  # Retrieve the authenticated user
         location = request.data.get('location')
+        location_latitude = request.data.get('location_latitude', None)
+        location_longitude = request.data.get('location_longitude', None)
         destination = request.data.get('destination')
+        destination_latitude = request.data.get('destination_latitude', None)
+        destination_longitude = request.data.get('destination_longitude', None)
         stop_location = request.data.get('stop_location', None)
+        stop_location_latitude = request.data.get('stop_location_latitude', None)
+        stop_location_longitude = request.data.get('stop_location_longitude', None)
         transportation_mode = request.data.get('transportation_mode')
         service_type = request.data.get('service_type', None)
         departure_time = request.data.get('departure_time')
         ticket_image = request.FILES.get('ticket_image', None)
+        radius_range = request.FILES.get('radius_range', None)
 
         # Validate required fields
         if not location or not destination or not transportation_mode or not departure_time:
@@ -547,12 +554,19 @@ class CreateRouteView(APIView):
         route = Route.objects.create(
             user=user,
             location=location,
+            location_latitude=location_latitude,
+            location_longitude=location_longitude,
             destination=destination,
+            destination_latitude=destination_latitude,
+            destination_longitude=destination_longitude,
             stop_location=stop_location,
+            stop_location_latitude=stop_location_latitude,
+            stop_location_longitude=stop_location_longitude,
             transportation_mode=transportation_mode,
             service_type=service_type,
             departure_time=departure_time,
             ticket_image=ticket_image,
+            radius_range=radius_range,
         )
         serializer = RouteSerializer(route)  # Serialize the created route instance
         return Response({"message": "Route created successfully.", "route": serializer.data},
@@ -587,12 +601,19 @@ class CreateScheduledRouteView(APIView):
         # Collect fields for the associated Route
         user = get_user_from_token(request)
         location = request.data.get('location')
+        location_latitude = request.data.get('location_latitude', None)
+        location_longitude = request.data.get('location_longitude', None)
         destination = request.data.get('destination')
+        destination_latitude = request.data.get('destination_latitude', None)
+        destination_longitude = request.data.get('destination_longitude', None)
         stop_location = request.data.get('stop_location', None)
+        stop_location_latitude = request.data.get('stop_location_latitude', None)
+        stop_location_longitude = request.data.get('stop_location_longitude', None)
         transportation_mode = request.data.get('transportation_mode')
         service_type = request.data.get('service_type', None)
         departure_time = request.data.get('departure_time')
         ticket_image = request.FILES.get('ticket_image', None)
+        radius_range = request.FILES.get('radius_range', None)
 
         # Validate required fields for the Route
         if not location or not destination or not transportation_mode or not departure_time:
@@ -603,12 +624,19 @@ class CreateScheduledRouteView(APIView):
         route = Route.objects.create(
             user=user,
             location=location,
+            location_latitude=location_latitude,
+            location_longitude=location_longitude,
             destination=destination,
+            destination_latitude=destination_latitude,
+            destination_longitude=destination_longitude,
             stop_location=stop_location,
+            stop_location_latitude=stop_location_latitude,
+            stop_location_longitude=stop_location_longitude,
             transportation_mode=transportation_mode,
             service_type=service_type,
             departure_time=departure_time,
             ticket_image=ticket_image,
+            radius_range=radius_range,
         )
 
         # Collect fields for ScheduledRoute

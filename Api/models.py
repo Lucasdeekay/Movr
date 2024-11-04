@@ -128,8 +128,13 @@ class Subscription(models.Model):
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField()
 
+    def save(self, *args, **kwargs):
+        if not self.end_date:
+            self.end_date = self.start_date + timezone.timedelta(days=self.plan.duration)
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.user.username} - {self.plan.name}"
+        return f"{self.user.email} - {self.plan.name}"
 
 
 class OTP(models.Model):
@@ -196,13 +201,20 @@ class Route(models.Model):
     user = models.ForeignKey('CustomUser', on_delete=models.CASCADE, related_name='routes')
     title = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
+    location_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    location_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     destination = models.CharField(max_length=255)
+    destination_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    destination_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     stop_location = models.CharField(max_length=255, null=True, blank=True)
+    stop_location_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    stop_location_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     transportation_mode = models.CharField(max_length=20, choices=TRANSPORTATION_MODE_CHOICES)
     service_type = models.CharField(max_length=20, choices=SERVICE_TYPE_CHOICES, null=True, blank=True)
     departure_time = models.DateTimeField()
     ticket_image = models.ImageField(upload_to='tickets/', null=True, blank=True)
     is_live = models.BooleanField(default=True)
+    radius_range = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Radius in km")
 
     def __str__(self):
         return f"Route from {self.location} to {self.destination} by {self.user.email}"
@@ -232,7 +244,11 @@ class Package(models.Model):
 
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='packages')
     location = models.CharField(max_length=255)
+    location_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    location_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     destination = models.CharField(max_length=255)
+    destination_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    destination_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     package_type = models.CharField(max_length=20, choices=PACKAGE_TYPE)
     item_image = models.ImageField(upload_to='package_images/', null=True, blank=True)
     item_description = models.TextField(null=True, blank=True)
