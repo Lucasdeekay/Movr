@@ -3,6 +3,7 @@ import string
 from _decimal import Decimal
 
 from django.contrib.auth.base_user import BaseUserManager, AbstractBaseUser
+from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.db import models
 from django.contrib.auth.models import PermissionsMixin
@@ -123,14 +124,23 @@ class SubscriptionPlan(models.Model):
 
 
 class Subscription(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='subscription')
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='subscriptions')
     plan = models.ForeignKey(SubscriptionPlan, on_delete=models.CASCADE)
-    start_date = models.DateTimeField(auto_now_add=True)
-    end_date = models.DateTimeField()
+    start_date = models.DateField(auto_now_add=True)
+    end_date = models.DateField(blank=True, null=True)  # Allow end_date to be blank initially
 
     def save(self, *args, **kwargs):
+        # If end_date is not set, calculate it based on start_date and plan duration
         if not self.end_date:
-            self.end_date = self.start_date + timezone.timedelta(days=self.plan.duration)
+            if hasattr(self.plan, 'duration'):
+                self.end_date = self.start_date + timezone.timedelta(days=self.plan.duration)
+            else:
+                raise ValidationError("The plan must have a duration attribute.")
+
+        # Ensure that end_date is not before start_date
+        if self.end_date < self.start_date:
+            raise ValidationError("end_date cannot be before start_date.")
+
         super().save(*args, **kwargs)
 
     def __str__(self):
