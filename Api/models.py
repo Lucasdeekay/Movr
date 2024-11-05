@@ -1,3 +1,4 @@
+import datetime
 import random
 import string
 from _decimal import Decimal
@@ -133,7 +134,7 @@ class Subscription(models.Model):
         # If end_date is not set, calculate it based on start_date and plan duration
         if not self.end_date:
             if hasattr(self.plan, 'duration'):
-                self.end_date = self.start_date + timezone.timedelta(days=self.plan.duration)
+                self.end_date = self.start_date + datetime.timedelta(days=self.plan.duration)
             else:
                 raise ValidationError("The plan must have a duration attribute.")
 
