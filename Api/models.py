@@ -131,10 +131,14 @@ class Subscription(models.Model):
     end_date = models.DateField(blank=True, null=True)  # Allow end_date to be blank initially
 
     def save(self, *args, **kwargs):
+        # Set start_date to now if it is not set
+        if self.start_date is None:
+            self.start_date = timezone.now().date()  # Use timezone.now() to get the current date
+
         # If end_date is not set, calculate it based on start_date and plan duration
         if not self.end_date:
             if hasattr(self.plan, 'duration'):
-                self.end_date = self.start_date + datetime.timedelta(days=self.plan.duration)
+                self.end_date = self.start_date + timezone.timedelta(days=self.plan.duration)
             else:
                 raise ValidationError("The plan must have a duration attribute.")
 
