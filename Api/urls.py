@@ -14,7 +14,7 @@ from .views import (
     ResetPasswordView, UpdateKYCView, UpdateVehicleInfoView, UpdatePersonalInfoView, UpdateSubscriptionPlanView,
     CreateRouteView, CreateScheduledRouteView, UserRoutesView, ToggleIsLiveRouteView, PackageSubmissionView,
     PlaceBidView, PickupConfirmationView, DeliveryConfirmationView, SelectMoverView, GetAllBidsView, GetBidDetailView,
-    GetPackageOfferDetailView
+    GetPackageOfferDetailView, ResendOTPView
 )
 
 # Initialize the router
@@ -36,15 +36,16 @@ router.register(r'days', DayViewSet, basename='day')
 # Include the router in your URL patterns
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
-    path('verify-otp/', VerifyOTPView.as_view(), name='verify_otp'),
+    path('verify-otp/', VerifyOTPView.as_view(), name='verify-otp'),
+    path('resend-otp', ResendOTPView.as_view(), name='resend-otp'),
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
-    path('forgot-password/', ForgotPasswordRequestOTPView.as_view(), name='forgot_password'),
-    path('reset-password/', ResetPasswordView.as_view(), name='reset_password'),
-    path('update-kyc/', UpdateKYCView.as_view(), name='update_kyc'),
-    path('update-vehicle/', UpdateVehicleInfoView.as_view(), name='update_vehicle'),
-    path('update-personal-info/', UpdatePersonalInfoView.as_view(), name='update_personal_info'),
-    path('update-subscription/', UpdateSubscriptionPlanView.as_view(), name='update_subscription'),
+    path('forgot-password/', ForgotPasswordRequestOTPView.as_view(), name='forgot-password'),
+    path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
+    path('update-kyc/', UpdateKYCView.as_view(), name='update-kyc'),
+    path('update-vehicle/', UpdateVehicleInfoView.as_view(), name='update-vehicle'),
+    path('update-personal-info/', UpdatePersonalInfoView.as_view(), name='update-personal-info'),
+    path('update-subscription/', UpdateSubscriptionPlanView.as_view(), name='update-subscription'),
     path('create-route/', CreateRouteView.as_view(), name='create-route'),
     path('create-scheduled-route/', CreateScheduledRouteView.as_view(), name='create-scheduled-route'),
     path('user-routes/', UserRoutesView.as_view(), name='user-routes'),

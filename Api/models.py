@@ -60,6 +60,7 @@ class KYC(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='kyc')
     bvn = models.CharField(max_length=11, unique=True, null=True, blank=True)
     nin = models.CharField(max_length=11, unique=True, null=True, blank=True)
+    driver_license = models.ImageField(upload_to='driver_license/', null=True, blank=True)
     verified = models.BooleanField(default=False)
 
     def __str__(self):

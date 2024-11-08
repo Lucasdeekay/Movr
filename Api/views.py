@@ -34,11 +34,11 @@ def get_user_from_token(request):
     :return: The user associated with the token
     :raises: AuthenticationFailed if token is invalid or missing
     """
-    token = request.headers.get('Authorization', '').split(' ')[1]
     try:
+        token = request.headers.get('Authorization', '').split(' ')[1]
         token = Token.objects.get(key=token)
         return token.user
-    except Token.DoesNotExist:
+    except Exception:
         raise AuthenticationFailed('Invalid token')
 
 
@@ -145,6 +145,41 @@ class VerifyOTPView(APIView):
             return Response({'message': 'Email verified successfully'}, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ResendOTPView(APIView):
+
+    @csrf_exempt
+    @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
+    def post(self, request, *args, **kwargs):
+        """
+        Resend a One-Time Password (OTP) to the user's email address.
+
+        This method handles the POST request for resending an OTP. It retrieves the user
+        based on the provided email, creates a new OTP for that user, and sends it to
+        their email address.
+
+        Parameters:
+        request (HttpRequest): The HTTP request object containing the user's data.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+        Response: A Django Rest Framework Response object.
+            - If successful, returns a 200 OK status with a success message.
+            - If the email is invalid, returns a 400 BAD REQUEST status with an error message.
+        """
+        email = request.data.get('email')
+    
+        try:
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            return Response({'error': 'Invalid email or phone number'}, status=status.HTTP_400_BAD_REQUEST)
+    
+        otp = OTP.objects.create(user=user)
+        otp.send_otp()
+    
+        return Response({'message': 'OTP sent to email'}, status=status.HTTP_200_OK)
 
 
 class LoginView(APIView):

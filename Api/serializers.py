@@ -63,7 +63,6 @@ class OTPSerializer(serializers.ModelSerializer):
 
 class OTPVerificationSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    phone_number = serializers.CharField()
     code = serializers.CharField()
 
     def validate(self, data):
