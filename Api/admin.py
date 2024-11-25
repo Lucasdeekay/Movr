@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, Wallet, Transaction, Transfer
+    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, Wallet, Transaction, Transfer, WithdrawalRequest
 
 
 @admin.register(CustomUser)
@@ -112,6 +112,13 @@ class TransferAdmin(admin.ModelAdmin):
     list_display = ("sender", "recipient", "amount", "timestamp")
     search_fields = ("sender__email", "recipient__email")
     ordering = ("-timestamp",)
+
+
+@admin.register(WithdrawalRequest)
+class WithdrawalRequestAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user', 'amount', 'bank_name', 'account_number', 'status', 'created_at']
+    list_filter = ['status', 'created_at']
+    search_fields = ['user__email', 'bank_name', 'account_number', 'amount', 'status']
 
 
 

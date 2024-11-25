@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
 from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, Wallet, Transaction, Transfer
+    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, Wallet, Transaction, Transfer, WithdrawalRequest
 
 
 class TokenSerializer(serializers.ModelSerializer):
@@ -158,6 +158,26 @@ class TransferSerializer(serializers.ModelSerializer):
         model = Transfer
         fields = ["id", "sender", "recipient", "amount", "timestamp", "message"]
         read_only_fields = ["id", "sender", "timestamp"]
+
+
+class WithdrawalRequestSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the WithdrawalRequest model.
+    """
+    class Meta:
+        model = WithdrawalRequest
+        fields = [
+            'id',
+            'user',
+            'amount',
+            'bank_name',
+            'account_number',
+            'status',
+            'reason',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = ['id', 'user', 'status', 'reason', 'created_at', 'updated_at']
 
 
 

@@ -3,10 +3,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day, Wallet, Transaction, Transfer
+    Route, ScheduledRoute, Day, Wallet, Transaction, Transfer, WithdrawalRequest
 from .serializers import CustomUserSerializer, KYCSerializer, VehicleSerializer, PaymentMethodSerializer, \
     SubscriptionPlanSerializer, SubscriptionSerializer, OTPSerializer, SocialMediaLinkSerializer, RouteSerializer, \
-    ScheduledRouteSerializer, DaySerializer, WalletSerializer, TransactionSerializer, TransferSerializer
+    ScheduledRouteSerializer, DaySerializer, WalletSerializer, TransactionSerializer, TransferSerializer, \
+    WithdrawalRequestSerializer
 
 
 class CustomUserViewSet(viewsets.ModelViewSet):
@@ -99,6 +100,9 @@ class TransferViewSet(viewsets.ModelViewSet):
         return Transfer.objects.filter(sender=self.request.user).order_by("-timestamp")
 
 
+class WithdrawalRequestViewSet(viewsets.ModelViewSet):
+    queryset = WithdrawalRequest.objects.all()
+    serializer_class = WithdrawalRequestSerializer
 
 
 # from rest_framework import viewsets

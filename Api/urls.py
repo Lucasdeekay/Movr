@@ -4,7 +4,7 @@ from .viewsets import (
     CustomUserViewSet, KYCViewSet, VehicleViewSet,
     PaymentMethodViewSet, SubscriptionPlanViewSet,
     SubscriptionViewSet, OTPViewSet, SocialMediaLinkViewSet, RouteViewSet, ScheduledRouteViewSet, DayViewSet,
-    WalletViewSet, TransactionViewSet, TransferViewSet
+    WalletViewSet, TransactionViewSet, TransferViewSet, WithdrawalRequestViewSet
 )
 from .views import (
     RegisterView,
@@ -36,6 +36,7 @@ router.register(r'days', DayViewSet, basename='day')
 router.register(r'wallets', WalletViewSet, basename='wallet')
 router.register(r'transactions', TransactionViewSet, basename='transaction')
 router.register(r'transfer', TransferViewSet, basename='transfer')
+router.register(r'withdrawal-requests', WithdrawalRequestViewSet, basename='withdrawal-requests')
 
 # Include the router in your URL patterns
 urlpatterns = [

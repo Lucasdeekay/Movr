@@ -12,6 +12,7 @@ from django.utils import timezone
 import qrcode
 from io import BytesIO
 from django.core.files import File
+from django.utils.translation import gettext_lazy as _
 
 from Movr import settings
 
@@ -229,6 +230,7 @@ class ScheduledRoute(models.Model):
     def __str__(self):
         return f"Scheduled Route for {self.route.user.email} from {self.route.location} to {self.route.destination}"
 
+
 class Package(models.Model):
     WEIGHT_CHOICES = [
         ('light', 'Light'),
@@ -259,6 +261,7 @@ class Package(models.Model):
     def __str__(self):
         return f"Package from {self.location} to {self.destination} by {self.user.email}"
 
+
 # Bid Model
 class Bid(models.Model):
     package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name='bids')
@@ -268,6 +271,7 @@ class Bid(models.Model):
 
     def __str__(self):
         return f"Bid by {self.mover.email} for {self.price}"
+
 
 # QR Code Model
 class QRCode(models.Model):
@@ -323,6 +327,7 @@ class Wallet(models.Model):
     def __str__(self):
         return f"{self.user.email} - Balance: {self.balance}"
 
+
 class Transaction(models.Model):
     TRANSACTION_TYPE_CHOICES = [
         ("deposit", "Deposit"),
@@ -339,6 +344,7 @@ class Transaction(models.Model):
     def __str__(self):
         return f"{self.user.email} - {self.transaction_type.capitalize()} - {self.amount}"
 
+
 class Transfer(models.Model):
     sender = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transfers_sent")
     recipient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transfers_received")
@@ -349,6 +355,57 @@ class Transfer(models.Model):
     def __str__(self):
         return f"{self.sender.email} -> {self.recipient.email}: {self.amount}"
 
+
+class WithdrawalRequest(models.Model):
+    """
+    Model to handle withdrawal requests.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="withdrawal_requests",
+        verbose_name=_("User")
+    )
+    amount = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        verbose_name=_("Amount")
+    )
+    bank_name = models.CharField(
+        max_length=100,
+        verbose_name=_("Bank Name")
+    )
+    account_number = models.CharField(
+        max_length=20,
+        verbose_name=_("Account Number")
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending',
+        verbose_name=_("Status")
+    )
+    reason = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name=_("Reason for Rejection")
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Created At")
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name=_("Updated At")
+    )
+
+    def __str__(self):
+        return f"Withdrawal Request {self.id} - {self.user.email} - {self.amount} ({self.status})"
 
 # class RideMatch(models.Model):
 #     travel_plan = models.ForeignKey(TravelPlan, on_delete=models.CASCADE, related_name='matches')

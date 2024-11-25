@@ -22,11 +22,12 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import TokenAuthentication
-from .models import Route, ScheduledRoute, Day, Package, Bid, PackageOffer, QRCode, Wallet, Transaction
+from .models import Route, ScheduledRoute, Day, Package, Bid, PackageOffer, QRCode, Wallet, Transaction, \
+    WithdrawalRequest
 from .models import CustomUser, KYC, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink
 from .serializers import CustomUserSerializer, OTPVerificationSerializer, TokenSerializer, VehicleSerializer, \
     KYCSerializer, SocialMediaLinkSerializer, RouteSerializer, ScheduledRouteSerializer, PackageSerializer, \
-    BidSerializer, PackageOfferSerializer, WalletSerializer, TransactionSerializer
+    BidSerializer, PackageOfferSerializer, WalletSerializer, TransactionSerializer, WithdrawalRequestSerializer
 from rest_framework.authtoken.models import Token
 import random
 
@@ -1144,17 +1145,20 @@ class DepositView(APIView):
 
 class WithdrawView(APIView):
     """
-    View to handle wallet withdrawals.
+    View to handle wallet withdrawal requests.
     """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         try:
-            user = get_user_from_token(request)
-            amount = request.data.get("amount")
+            user = request.user  # Assuming `request.user` is provided by the authentication class.
 
-            # Validate amount
+            # Extract and validate request data
+            amount = request.data.get("amount")
+            bank_name = request.data.get("bank_name")
+            account_number = request.data.get("account_number")
+
             if not amount:
                 return Response({"error": "Amount is required."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1166,33 +1170,67 @@ class WithdrawView(APIView):
             if amount <= 0:
                 return Response({"error": "Amount must be greater than zero."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Get wallet
+            if not bank_name or not account_number:
+                return Response(
+                    {"error": "Bank name and account number are required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Get user's wallet
             wallet = Wallet.objects.filter(user=user).first()
             if not wallet:
                 return Response({"error": "Wallet not found for the user."}, status=status.HTTP_404_NOT_FOUND)
 
-            # Perform withdrawal
-            try:
-                wallet.withdraw(amount)
+            if wallet.balance < amount:
+                return Response(
+                    {"error": f"Insufficient funds. Your current balance is {wallet.balance:.2f}."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Create withdrawal request and update wallet balance atomically
+            with transaction.atomic():
+                # Deduct amount from wallet balance
+                wallet.balance -= amount
                 wallet.save()
-            except ValueError as e:
-                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Create transaction record
-            Transaction.objects.create(user=user, transaction_type="withdrawal", amount=amount, description="Wallet withdrawal")
+                # Create a withdrawal request
+                withdrawal_request = WithdrawalRequest.objects.create(
+                    user=user,
+                    amount=amount,
+                    bank_name=bank_name,
+                    account_number=account_number,
+                )
 
-            # Serialize and return updated wallet
-            serializer = WalletSerializer(wallet)
-            return Response({"message": "Withdrawal successful", "wallet": serializer.data}, status=status.HTTP_200_OK)
+            # Serialize and return the withdrawal request details
+            withdrawal_serializer = WithdrawalRequestSerializer(withdrawal_request)
+            wallet_serializer = WalletSerializer(wallet)
+
+            return Response(
+                {
+                    "message": "Withdrawal request submitted successfully.",
+                    "withdrawal_request": withdrawal_serializer.data,
+                    "wallet": wallet_serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
 
         except IntegrityError:
-            return Response({"error": "Database integrity error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": "A database integrity error occurred."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         except DatabaseError:
-            return Response({"error": "A database error occurred. Please try again later."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": "A database error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         except Exception as e:
-            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": f"An unexpected error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class WalletDetailsView(APIView):
