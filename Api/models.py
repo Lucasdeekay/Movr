@@ -306,6 +306,50 @@ class PackageOffer(models.Model):
         return f"Package Offer for {self.package_bid.package.location} to {self.package_bid.package.destination}"
 
 
+class Wallet(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="wallet")
+    balance = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+
+    def deposit(self, amount):
+        self.balance += Decimal(amount)
+        self.save()
+
+    def withdraw(self, amount):
+        if amount > self.balance:
+            raise ValueError("Insufficient funds")
+        self.balance -= Decimal(amount)
+        self.save()
+
+    def __str__(self):
+        return f"{self.user.email} - Balance: {self.balance}"
+
+class Transaction(models.Model):
+    TRANSACTION_TYPE_CHOICES = [
+        ("deposit", "Deposit"),
+        ("withdrawal", "Withdrawal"),
+        ("transfer", "Transfer"),
+    ]
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transactions")
+    transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPE_CHOICES)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    timestamp = models.DateTimeField(default=timezone.now)
+    description = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.transaction_type.capitalize()} - {self.amount}"
+
+class Transfer(models.Model):
+    sender = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transfers_sent")
+    recipient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transfers_received")
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    timestamp = models.DateTimeField(default=timezone.now)
+    message = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.sender.email} -> {self.recipient.email}: {self.amount}"
+
+
 # class RideMatch(models.Model):
 #     travel_plan = models.ForeignKey(TravelPlan, on_delete=models.CASCADE, related_name='matches')
 #     matched_user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='matches')

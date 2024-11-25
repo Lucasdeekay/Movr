@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .viewsets import (
     CustomUserViewSet, KYCViewSet, VehicleViewSet,
     PaymentMethodViewSet, SubscriptionPlanViewSet,
-    SubscriptionViewSet, OTPViewSet, SocialMediaLinkViewSet, RouteViewSet, ScheduledRouteViewSet, DayViewSet
+    SubscriptionViewSet, OTPViewSet, SocialMediaLinkViewSet, RouteViewSet, ScheduledRouteViewSet, DayViewSet,
+    WalletViewSet, TransactionViewSet, TransferViewSet
 )
 from .views import (
     RegisterView,
@@ -14,7 +15,7 @@ from .views import (
     ResetPasswordView, UpdateKYCView, UpdateVehicleInfoView, UpdatePersonalInfoView, UpdateSubscriptionPlanView,
     CreateRouteView, CreateScheduledRouteView, UserRoutesView, ToggleIsLiveRouteView, PackageSubmissionView,
     PlaceBidView, PickupConfirmationView, DeliveryConfirmationView, SelectMoverView, GetAllBidsView, GetBidDetailView,
-    GetPackageOfferDetailView, ResendOTPView
+    GetPackageOfferDetailView, ResendOTPView, DepositView, WithdrawView, WalletDetailsView
 )
 
 # Initialize the router
@@ -32,6 +33,9 @@ router.register(r'otps', OTPViewSet, basename='otp')
 router.register(r'routes', RouteViewSet, basename='route')
 router.register(r'scheduled-routes', ScheduledRouteViewSet, basename='scheduled-route')
 router.register(r'days', DayViewSet, basename='day')
+router.register(r'wallets', WalletViewSet, basename='wallet')
+router.register(r'transactions', TransactionViewSet, basename='transaction')
+router.register(r'transfer', TransferViewSet, basename='transfer')
 
 # Include the router in your URL patterns
 urlpatterns = [
@@ -58,5 +62,8 @@ urlpatterns = [
     path('package-offer/<int:package_offer_id>/', GetPackageOfferDetailView.as_view(), name='get-package-offer-detail'),
     path('confirm-pickup/<int:package_offer_id>/', PickupConfirmationView.as_view(), name='confirm-pickup'),
     path('confirm-delivery/<int:package_offer_id>/', DeliveryConfirmationView.as_view(), name='confirm-delivery'),
+    path('wallet/', WalletDetailsView.as_view(), name='wallet-details'),
+    path("wallet/deposit/", DepositView.as_view(), name="wallet-deposit"),
+    path("wallet/withdraw/", WithdrawView.as_view(), name="wallet-withdraw"),
     path('api/', include(router.urls)),
 ]

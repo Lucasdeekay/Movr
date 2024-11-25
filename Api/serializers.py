@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
 from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer
+    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, Wallet, Transaction, Transfer
 
 
 class TokenSerializer(serializers.ModelSerializer):
@@ -137,6 +137,27 @@ class PackageOfferSerializer(serializers.ModelSerializer):
         model = PackageOffer
         fields = '__all__'
 
+
+class WalletSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Wallet
+        fields = ["id", "user", "balance"]
+        read_only_fields = ["id", "user", "balance"]
+
+class TransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Transaction
+        fields = ["id", "user", "transaction_type", "amount", "timestamp", "description"]
+        read_only_fields = ["id", "user", "timestamp"]
+
+class TransferSerializer(serializers.ModelSerializer):
+    sender = serializers.StringRelatedField(read_only=True)
+    recipient = serializers.StringRelatedField()
+
+    class Meta:
+        model = Transfer
+        fields = ["id", "sender", "recipient", "amount", "timestamp", "message"]
+        read_only_fields = ["id", "sender", "timestamp"]
 
 
 

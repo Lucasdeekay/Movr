@@ -5,7 +5,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction, DatabaseError
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.decorators import method_decorator
@@ -22,11 +22,11 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import TokenAuthentication
-from .models import Route, ScheduledRoute, Day, Package, Bid, PackageOffer, QRCode
+from .models import Route, ScheduledRoute, Day, Package, Bid, PackageOffer, QRCode, Wallet, Transaction
 from .models import CustomUser, KYC, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink
 from .serializers import CustomUserSerializer, OTPVerificationSerializer, TokenSerializer, VehicleSerializer, \
     KYCSerializer, SocialMediaLinkSerializer, RouteSerializer, ScheduledRouteSerializer, PackageSerializer, \
-    BidSerializer, PackageOfferSerializer
+    BidSerializer, PackageOfferSerializer, WalletSerializer, TransactionSerializer
 from rest_framework.authtoken.models import Token
 import random
 
@@ -45,6 +45,38 @@ def get_user_from_token(request):
         return token.user
     except Exception:
         raise AuthenticationFailed('Invalid token')
+
+def perform_transfer(sender, receiver_email, amount, message=""):
+    """
+    Function to perform a transfer between a sender and a receiver.
+    """
+    try:
+        # Validate the receiver
+        receiver_wallet = Wallet.objects.get(user__email=receiver_email)
+    except Wallet.DoesNotExist:
+        raise ValueError("Recipient not found")
+
+    # Fetch sender's wallet
+    sender_wallet, _ = Wallet.objects.get_or_create(user=sender)
+
+    # Validate sender's balance
+    if sender_wallet.balance < amount:
+        raise ValueError("Insufficient funds")
+
+    with transaction.atomic():
+        # Deduct amount from sender
+        sender_wallet.withdraw(amount)
+        sender_wallet.save()
+
+        # Add amount to receiver
+        receiver_wallet.deposit(amount)
+        receiver_wallet.save()
+
+        # Create transaction records
+        Transaction.objects.create(user=sender, transaction_type="transfer", amount=amount, description=f"Transfer to {receiver_email}")
+        Transaction.objects.create(user=receiver_wallet.user, transaction_type="deposit", amount=amount, description=f"Received from {sender.email}")
+
+    return {"message": "Transfer successful"}
 
 
 class RegisterView(APIView):
@@ -1060,3 +1092,136 @@ class DeliveryConfirmationView(APIView):
             return Response({"message": "Delivery confirmed."}, status=200)
         else:
             return Response({"error": "Invalid code."}, status=400)
+
+
+class DepositView(APIView):
+    """
+    View to handle wallet deposits.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            user = get_user_from_token(request)
+            amount = request.data.get("amount")
+
+            # Validate amount
+            if not amount:
+                return Response({"error": "Amount is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                amount = float(amount)
+            except ValueError:
+                return Response({"error": "Amount must be a valid number."}, status=status.HTTP_400_BAD_REQUEST)
+
+            if amount <= 0:
+                return Response({"error": "Amount must be greater than zero."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get or create wallet
+            wallet, _ = Wallet.objects.get_or_create(user=user)
+
+            # Update wallet balance
+            wallet.deposit(amount)
+            wallet.save()
+
+            # Create transaction record
+            Transaction.objects.create(user=user, transaction_type="deposit", amount=amount, description="Wallet deposit")
+
+            # Serialize and return updated wallet
+            serializer = WalletSerializer(wallet)
+            return Response({"message": "Deposit successful", "wallet": serializer.data}, status=status.HTTP_200_OK)
+
+        except IntegrityError:
+            return Response({"error": "Database integrity error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except DatabaseError:
+            return Response({"error": "A database error occurred. Please try again later."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class WithdrawView(APIView):
+    """
+    View to handle wallet withdrawals.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            user = get_user_from_token(request)
+            amount = request.data.get("amount")
+
+            # Validate amount
+            if not amount:
+                return Response({"error": "Amount is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                amount = float(amount)
+            except ValueError:
+                return Response({"error": "Amount must be a valid number."}, status=status.HTTP_400_BAD_REQUEST)
+
+            if amount <= 0:
+                return Response({"error": "Amount must be greater than zero."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get wallet
+            wallet = Wallet.objects.filter(user=user).first()
+            if not wallet:
+                return Response({"error": "Wallet not found for the user."}, status=status.HTTP_404_NOT_FOUND)
+
+            # Perform withdrawal
+            try:
+                wallet.withdraw(amount)
+                wallet.save()
+            except ValueError as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Create transaction record
+            Transaction.objects.create(user=user, transaction_type="withdrawal", amount=amount, description="Wallet withdrawal")
+
+            # Serialize and return updated wallet
+            serializer = WalletSerializer(wallet)
+            return Response({"message": "Withdrawal successful", "wallet": serializer.data}, status=status.HTTP_200_OK)
+
+        except IntegrityError:
+            return Response({"error": "Database integrity error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except DatabaseError:
+            return Response({"error": "A database error occurred. Please try again later."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class WalletDetailsView(APIView):
+    """
+    View to return wallet details and transactions of the authenticated user.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        try:
+            user = get_user_from_token(request)
+
+            # Fetch wallet
+            wallet = Wallet.objects.filter(user=user).first()
+            if not wallet:
+                return Response({"error": "Wallet not found for the user."}, status=status.HTTP_404_NOT_FOUND)
+
+            # Serialize wallet details
+            wallet_serializer = WalletSerializer(wallet)
+
+            # Fetch and serialize transactions
+            transactions = Transaction.objects.filter(user=user).order_by('-created_at')
+            transaction_serializer = TransactionSerializer(transactions, many=True)
+
+            return Response({
+                "wallet": wallet_serializer.data,
+                "transactions": transaction_serializer.data
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

@@ -1,11 +1,12 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day
+    Route, ScheduledRoute, Day, Wallet, Transaction, Transfer
 from .serializers import CustomUserSerializer, KYCSerializer, VehicleSerializer, PaymentMethodSerializer, \
     SubscriptionPlanSerializer, SubscriptionSerializer, OTPSerializer, SocialMediaLinkSerializer, RouteSerializer, \
-    ScheduledRouteSerializer, DaySerializer
+    ScheduledRouteSerializer, DaySerializer, WalletSerializer, TransactionSerializer, TransferSerializer
 
 
 class CustomUserViewSet(viewsets.ModelViewSet):
@@ -64,6 +65,38 @@ class DayViewSet(viewsets.ModelViewSet):
     serializer_class = DaySerializer
     queryset = Day.objects.all()
     permission_classes = [IsAuthenticated]
+
+
+class WalletViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet to manage Wallet operations.
+    """
+    serializer_class = WalletSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Wallet.objects.filter(user=self.request.user)
+
+
+class TransactionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet to manage user transactions.
+    """
+    serializer_class = TransactionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Transaction.objects.filter(user=self.request.user).order_by("-timestamp")
+
+class TransferViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet to manage transfers between users.
+    """
+    serializer_class = TransferSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Transfer.objects.filter(sender=self.request.user).order_by("-timestamp")
 
 
 

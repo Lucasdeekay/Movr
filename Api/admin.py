@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer
+    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, Wallet, Transaction, Transfer
 
 
 @admin.register(CustomUser)
@@ -93,6 +93,25 @@ class PackageOfferAdmin(admin.ModelAdmin):
     list_display = ('package_bid', 'qr_code', 'is_picked_up', 'is_delivered')
     search_fields = ('package_bid__package__location', 'package_bid__package__destination', 'is_picked_up', 'is_delivered')
 
+
+@admin.register(Wallet)
+class WalletAdmin(admin.ModelAdmin):
+    list_display = ("user", "balance")
+    search_fields = ("user__email",)
+    ordering = ("user",)
+
+@admin.register(Transaction)
+class TransactionAdmin(admin.ModelAdmin):
+    list_display = ("user", "transaction_type", "amount", "timestamp")
+    search_fields = ("user__email", "transaction_type")
+    list_filter = ("transaction_type", "timestamp")
+    ordering = ("-timestamp",)
+
+@admin.register(Transfer)
+class TransferAdmin(admin.ModelAdmin):
+    list_display = ("sender", "recipient", "amount", "timestamp")
+    search_fields = ("sender__email", "recipient__email")
+    ordering = ("-timestamp",)
 
 
 
