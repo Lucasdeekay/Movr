@@ -44,6 +44,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True)
     two_factor_enabled = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
+    is_staff = models.BooleanField(default=False)
 
     objects = UserManager()
 
@@ -130,24 +131,6 @@ class Subscription(models.Model):
     plan = models.ForeignKey(SubscriptionPlan, on_delete=models.CASCADE)
     start_date = models.DateField(auto_now_add=True)
     end_date = models.DateField(blank=True, null=True)  # Allow end_date to be blank initially
-
-    def save(self, *args, **kwargs):
-        # Set start_date to now if it is not set
-        if self.start_date is None:
-            self.start_date = timezone.now().date()  # Use timezone.now() to get the current date
-
-        # If end_date is not set, calculate it based on start_date and plan duration
-        if not self.end_date:
-            if hasattr(self.plan, 'duration'):
-                self.end_date = self.start_date + timezone.timedelta(days=self.plan.duration)
-            else:
-                raise ValidationError("The plan must have a duration attribute.")
-
-        # Ensure that end_date is not before start_date
-        if self.end_date < self.start_date:
-            raise ValidationError("end_date cannot be before start_date.")
-
-        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.user.email} - {self.plan.name}"
@@ -309,7 +292,7 @@ class QRCode(models.Model):
         # Save the QR code image
         buffer = BytesIO()
         img.save(buffer, format="PNG")
-        self.qr_image.save(f'{self.package.id}_qr.png', File(buffer), save=False)
+        self.qr_image.save(f'{self.code}_qr.png', File(buffer), save=False)
         super().save(*args, **kwargs)
 
 

@@ -109,6 +109,9 @@ class PackageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Package
         fields = '__all__'
+        extra_kwargs = {
+            'user': {'read_only': True},  # Make the 'user' field read-only
+        }
 
 class BidSerializer(serializers.ModelSerializer):
     mover_details = serializers.SerializerMethodField()

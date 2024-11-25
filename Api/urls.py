@@ -37,7 +37,7 @@ router.register(r'days', DayViewSet, basename='day')
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('verify-otp/', VerifyOTPView.as_view(), name='verify-otp'),
-    path('resend-otp', ResendOTPView.as_view(), name='resend-otp'),
+    path('resend-otp/', ResendOTPView.as_view(), name='resend-otp'),
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('forgot-password/', ForgotPasswordRequestOTPView.as_view(), name='forgot-password'),
@@ -55,8 +55,8 @@ urlpatterns = [
     path('package/<int:package_id>/bids/', GetAllBidsView.as_view(), name='get-all-bids'),
     path('bid/<int:bid_id>/', GetBidDetailView.as_view(), name='get-bid-detail'),
     path('select-mover/<int:bid_id>/', SelectMoverView.as_view(), name='select-mover'),
+    path('package-offer/<int:package_offer_id>/', GetPackageOfferDetailView.as_view(), name='get-package-offer-detail'),
     path('confirm-pickup/<int:package_offer_id>/', PickupConfirmationView.as_view(), name='confirm-pickup'),
     path('confirm-delivery/<int:package_offer_id>/', DeliveryConfirmationView.as_view(), name='confirm-delivery'),
-    path('package-offer/<int:package_offer_id>/', GetPackageOfferDetailView.as_view(), name='get-package-offer-detail'),
     path('api/', include(router.urls)),
 ]

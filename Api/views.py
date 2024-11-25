@@ -3,6 +3,9 @@ from datetime import timedelta
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.tokens import default_token_generator
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.db import IntegrityError
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.decorators import method_decorator
@@ -11,11 +14,13 @@ from django_ratelimit.decorators import ratelimit
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from rest_framework.decorators import permission_classes
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import TokenAuthentication
 from .models import Route, ScheduledRoute, Day, Package, Bid, PackageOffer, QRCode
 from .models import CustomUser, KYC, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink
@@ -53,7 +58,7 @@ class RegisterView(APIView):
     """
 
     @csrf_exempt
-    @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
+    @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True), name='post')
     def post(self, request, *args, **kwargs):
         """
         Handle POST requests for user registration.
@@ -66,12 +71,13 @@ class RegisterView(APIView):
         Returns:
             Response: A Response object containing the serialized user data or error messages.
         """
+
         serializer = CustomUserSerializer(data=request.data)
         if serializer.is_valid():
             try:
                 # Create the user
                 user = CustomUser.objects.create(
-                    email=serializer.validated_data['email'],
+                    email=serializer.validated_data['email']
                 )
                 user.set_password(request.data.get('password'))
                 user.save()
@@ -117,34 +123,33 @@ class VerifyOTPView(APIView):
         Returns:
             Response: A Response object indicating the result of the OTP verification.
         """
-        serializer = OTPVerificationSerializer(data=request.data)
-        if serializer.is_valid():
-            try:
-                # Retrieve the OTP object based on the user's email and provided code
-                otp = OTP.objects.get(
-                    user__email=serializer.validated_data['email'],
-                    code=serializer.validated_data['code']
-                )
-            except OTP.DoesNotExist:
-                return Response({'error': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            # Retrieve the OTP object based on the user's email and provided code
+            otp = OTP.objects.get(
+                user__email=request.data['email'],
+                code=request.data['code']
+            )
+        except OTP.DoesNotExist:
+            return Response({'error': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Check if the OTP has already been used
-            if otp.is_used:
-                return Response({'error': 'OTP has already been used'}, status=status.HTTP_400_BAD_REQUEST)
+        # Check if the OTP has already been used
+        if otp.is_used:
+            return Response({'error': 'OTP has already been used'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Check if the OTP has expired
-            if otp.is_expired():
-                return Response({'error': 'OTP has expired'}, status=status.HTTP_400_BAD_REQUEST)
+        print(otp.created_at)
+        print(otp.expires_at)
+        print(otp.is_expired())
+        # Check if the OTP has expired
+        if otp.is_expired():
+            return Response({'error': 'OTP has expired'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Mark the OTP as used and verify the user's email
-            otp.is_used = True
-            otp.user.is_email_verified = True
-            otp.user.save()
-            otp.save()
+        # Mark the OTP as used and verify the user's email
+        otp.is_used = True
+        otp.user.is_email_verified = True
+        otp.user.save()
+        otp.save()
 
-            return Response({'message': 'Email verified successfully'}, status=status.HTTP_200_OK)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': 'Email verified successfully'}, status=status.HTTP_200_OK)
 
 
 class ResendOTPView(APIView):
@@ -233,8 +238,7 @@ class LogoutView(APIView):
     API view for user logout.
 
     This view handles the logout process for authenticated users.
-    It retrieves the user's token, logs them out, and deletes the token
-    to ensure the user is logged out successfully.
+    It deletes the user's token to ensure they are logged out.
     """
 
     authentication_classes = [TokenAuthentication]
@@ -250,16 +254,14 @@ class LogoutView(APIView):
         Returns:
             Response: A Response object indicating the result of the logout process.
         """
-        # Retrieve the token for the authenticated user
         try:
-            user = get_user_from_token(request)  # Function to retrieve user from token
-            logout(user)  # Log out the user
-            token = Token.objects.get(user=user)  # Get the user's token
-            # Delete the token to log out the user
-            token.delete()
+            # Get the user's token and delete it to log them out
+            user = get_user_from_token(request)
+            user.auth_token.delete()
             return Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
         except Token.DoesNotExist:
             return Response({"detail": "Invalid token or user already logged out."}, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class ForgotPasswordRequestOTPView(APIView):
@@ -363,6 +365,7 @@ class ResetPasswordView(APIView):
         return Response({'message': 'Password reset successful'}, status=status.HTTP_200_OK)
 
 
+
 class UpdateKYCView(APIView):
     """
     API view for updating the user's KYC (Know Your Customer) information.
@@ -391,8 +394,44 @@ class UpdateKYCView(APIView):
         user = get_user_from_token(request)  # Retrieve the authenticated user
         data = request.data  # Get the KYC data from the request
 
+        # Check for mandatory fields in the request data
+        if 'bvn' not in data or 'nin' not in data:
+            return Response(
+                {'error': 'Both BVN and NIN are required fields.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate BVN and NIN (assuming they are 11 digits)
+        if len(data['bvn']) != 11 or len(data['nin']) != 11:
+            return Response(
+                {'error': 'Both BVN and NIN must be exactly 11 digits.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Get or create a KYC record for the user
         kyc, created = KYC.objects.get_or_create(user=user)
+
+        # If there's an image file, ensure it is a valid image
+        if 'driver_license' in data:
+            driver_license = data['driver_license']
+
+            if isinstance(driver_license, InMemoryUploadedFile):  # Ensure the file is uploaded correctly
+                if not driver_license.content_type.startswith('image'):
+                    return Response(
+                        {'error': 'Driver license must be an image file.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                if driver_license.size > 5 * 1024 * 1024:  # Limit file size to 5MB
+                    return Response(
+                        {'error': 'Driver license image size must be under 5MB.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                return Response(
+                    {'error': 'Driver license is required to be an image.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         # Initialize the serializer with the existing KYC data and the new data
         serializer = KYCSerializer(kyc, data=data, partial=True)
@@ -401,7 +440,8 @@ class UpdateKYCView(APIView):
             serializer.save()  # Save the updated KYC data
             return Response({'message': 'KYC updated successfully', 'kyc': serializer.data}, status=status.HTTP_200_OK)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)  # Return validation errors if any
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class UpdateVehicleInfoView(APIView):
@@ -410,8 +450,6 @@ class UpdateVehicleInfoView(APIView):
 
     This view allows authenticated users to update their vehicle details.
     If no vehicle record exists for the user, a new one is created.
-    The view utilizes token-based authentication to ensure that only
-    authenticated users can access this endpoint.
     """
 
     authentication_classes = [TokenAuthentication]
@@ -432,64 +470,152 @@ class UpdateVehicleInfoView(APIView):
         user = get_user_from_token(request)  # Retrieve the authenticated user
         data = request.data  # Get the vehicle data from the request
 
+        # Check for mandatory fields in the request data
+        if 'vehicle_plate_number' not in data or 'vehicle_type' not in data:
+            return Response(
+                {'error': 'Both vehicle_plate_number and vehicle_type are required fields.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate vehicle_plate_number (e.g., should not be empty and be unique)
+        if data.get('vehicle_plate_number') and len(data['vehicle_plate_number']) < 4:
+            return Response(
+                {'error': 'Vehicle plate number must be at least 4 characters long.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Get or create a vehicle record for the user
         vehicle, created = Vehicle.objects.get_or_create(user=user)
+
+        # Validate uploaded images if provided
+        image_fields = [
+            'vehicle_photo',
+            'driver_license',
+            'vehicle_inspector_report',
+            'vehicle_insurance'
+        ]
+
+        for field in image_fields:
+            if field in data:
+                image_file = data[field]
+
+                # Check if the uploaded file is a valid image
+                if isinstance(image_file, InMemoryUploadedFile):
+                    if not image_file.content_type.startswith('image'):
+                        return Response(
+                            {'error': f'{field} must be an image file.'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
+                    # Limit file size to 5MB
+                    if image_file.size > 5 * 1024 * 1024:
+                        return Response(
+                            {'error': f'{field} image size must be under 5MB.'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                else:
+                    return Response(
+                        {'error': f'{field} is required to be a valid image file.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
         # Initialize the serializer with the existing vehicle data and the new data
         serializer = VehicleSerializer(vehicle, data=data, partial=True)
 
         if serializer.is_valid():
             serializer.save()  # Save the updated vehicle data
-            return Response({'message': 'Vehicle information updated successfully', 'vehicle': serializer.data},
-                            status=status.HTTP_200_OK)
+            return Response(
+                {'message': 'Vehicle information updated successfully', 'vehicle': serializer.data},
+                status=status.HTTP_200_OK
+            )
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)  # Return validation errors if any
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UpdatePersonalInfoView(APIView):
     """
     API view for updating a user's personal information and social media links.
-
-    This view allows authenticated users to update their personal information
-    (excluding email) and their social media links. The view utilizes token-based
-    authentication to ensure that only authenticated users can access this endpoint.
+    This view handles proper error responses for invalid inputs and constraints.
     """
 
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]  # To handle file uploads
 
     def post(self, request, *args, **kwargs):
         """
-        Handle POST requests for updating personal information.
-
-        Args:
-            request: The HTTP request object containing the user data and social media links to be updated.
-            *args: Additional positional arguments.
-            **kwargs: Additional keyword arguments.
-
-        Returns:
-            Response: A Response object containing the updated user and social media data,
-                      or error messages if validation fails.
+        Handle POST requests for updating personal information and social media links.
         """
         user = get_user_from_token(request)  # Retrieve the authenticated user
-        social_media, created = SocialMediaLink.objects.get_or_create(user=user)
+        data = request.data
 
-        # Update user data (excluding email)
+        # Validate profile picture (if provided)
+        profile_picture = data.get('profile_picture')
+        if profile_picture:
+            if not profile_picture.content_type.startswith('image'):
+                return Response(
+                    {'error': 'Profile picture must be a valid image file.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if profile_picture.size > 5 * 1024 * 1024:  # Limit size to 5MB
+                return Response(
+                    {'error': 'Profile picture size must be under 5MB.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Fetch or create social media link instance
+        try:
+            social_media, _ = SocialMediaLink.objects.get_or_create(user=user)
+        except IntegrityError:
+            return Response(
+                {'error': 'Error fetching or creating social media links.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # Initialize serializers
         user_serializer = CustomUserSerializer(user, data=request.data, partial=True)
         social_media_serializer = SocialMediaLinkSerializer(social_media, data=request.data, partial=True)
 
-        if user_serializer.is_valid() and social_media_serializer.is_valid():
-            user_serializer.save()  # Save the updated user information
-            social_media_serializer.save()  # Save the updated social media links
-            return Response({
-                'user': user_serializer.data,
-                'social_media': social_media_serializer.data
-            }, status=status.HTTP_200_OK)
+        # Check for validation errors
+        if not user_serializer.is_valid():
+            return Response(
+                {'user_errors': user_serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not social_media_serializer.is_valid():
+            return Response(
+                {'social_media_errors': social_media_serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Save updates if serializers are valid
+            user_serializer.save()
+            social_media_serializer.save()
+        except IntegrityError as e:
+            # Handle unique field constraint errors (phone, social media links)
+            if "unique" in str(e):
+                return Response(
+                    {'error': 'Provided fields must be unique. Check email, phone number, or social media links.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            return Response(
+                {'error': 'An error occurred while updating user information.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except ValidationError as e:
+            return Response(
+                {'validation_error': e.message_dict},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         return Response({
-            'user_errors': user_serializer.errors,
-            'social_media_errors': social_media_serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)  # Return validation errors if any
+            'message': 'User information updated successfully',
+            'user': user_serializer.data,
+            'social_media': social_media_serializer.data
+        }, status=status.HTTP_200_OK)
+
 
 
 class UpdateSubscriptionPlanView(APIView):
@@ -529,7 +655,7 @@ class UpdateSubscriptionPlanView(APIView):
             return Response({"error": "Subscription plan not found."}, status=status.HTTP_404_NOT_FOUND)
 
         # Get or create a subscription record for the user
-        subscription, created = Subscription.objects.get_or_create(user=user)
+        subscription = Subscription.objects.get(user=user)
 
         # Calculate new end date based on the duration of the plan
         subscription.plan = plan
@@ -772,9 +898,10 @@ class PackageSubmissionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        user = get_user_from_token(request)
         serializer = PackageSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(user=request.user)
+            serializer.save(user=user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -790,7 +917,10 @@ class PlaceBidView(APIView):
         if not price:
             return Response({"error": "Price is required to place a bid."}, status=400)
 
-        package = Package.objects.get(id=package_id)
+        try:
+            package = Package.objects.get(id=package_id)
+        except Package.DoesNotExist:
+            return Response({"error": "Package not found."}, status=status.HTTP_404_NOT_FOUND)
 
         # Create a new bid
         bid = Bid.objects.create(
@@ -855,22 +985,30 @@ class SelectMoverView(APIView):
     def post(self, request, bid_id):
         try:
             user = get_user_from_token(request)
+
             # Retrieve the bid using the bid_id
             bid = Bid.objects.get(id=bid_id)
 
             # Ensure the user requesting the bid details is either the owner of the package or the mover who made the bid
             if bid.package.user != user and bid.mover != user:
-                return Response({"error": "You are not authorized to view this bid."}, status=403)
+                return Response({"error": "You are not authorized to select a mover for this package."}, status=403)
 
+            # Check if the bid has already been selected (if that's a business rule you have)
+            if PackageOffer.objects.filter(package_bid=bid).exists():
+                return Response({"error": "Mover has already been selected for this bid."}, status=400)
+
+            # Create a new QR code for the selected mover
             qr_code = QRCode()
             qr_code.save()
+
+            # Create a PackageOffer for the bid and associate the QR code
             PackageOffer.objects.create(package_bid=bid, qr_code=qr_code)
 
             return Response({"message": f"{bid.mover.email} has been selected for the delivery."},
-                            status=200)
+                            status=status.HTTP_200_OK)
 
         except Bid.DoesNotExist:
-            return Response({"error": "Bid not found."}, status=404)
+            return Response({"error": "Bid not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
 class GetPackageOfferDetailView(APIView):
