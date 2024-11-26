@@ -1,6 +1,8 @@
 import datetime
 import random
 import string
+import uuid
+
 from _decimal import Decimal
 
 from django.contrib.auth.base_user import BaseUserManager, AbstractBaseUser
@@ -198,7 +200,7 @@ class Route(models.Model):
         ('delivery', 'Delivery'),
     ]
 
-    user = models.ForeignKey('CustomUser', on_delete=models.CASCADE, related_name='routes')
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='routes')
     title = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
     location_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
@@ -305,9 +307,12 @@ class PackageOffer(models.Model):
     qr_code = models.ForeignKey(QRCode, on_delete=models.CASCADE, related_name='package_offers')
     is_picked_up = models.BooleanField(default=False)
     is_delivered = models.BooleanField(default=False)
+    is_scheduled = models.BooleanField(default=False)  # New field to indicate scheduling
+    is_cancelled = models.BooleanField(default=False)  # New field to track cancellations
 
     def __str__(self):
         return f"Package Offer for {self.package_bid.package.location} to {self.package_bid.package.destination}"
+
 
 
 class Wallet(models.Model):
@@ -407,84 +412,77 @@ class WithdrawalRequest(models.Model):
     def __str__(self):
         return f"Withdrawal Request {self.id} - {self.user.email} - {self.amount} ({self.status})"
 
-# class RideMatch(models.Model):
-#     travel_plan = models.ForeignKey(TravelPlan, on_delete=models.CASCADE, related_name='matches')
-#     matched_user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='matches')
-#     status = models.CharField(max_length=50, choices=[('pending', 'Pending'), ('accepted', 'Accepted'), ('completed', 'Completed')], default='pending')
-#
-#     def __str__(self):
-#         return f"{self.travel_plan} - Matched with {self.matched_user.username}"
-#
-# class RideTracking(models.Model):
-#     ride_match = models.OneToOneField(RideMatch, on_delete=models.CASCADE, related_name='tracking')
-#     current_location = models.CharField(max_length=255)
-#     updated_at = models.DateTimeField(auto_now=True)
-#
-#     def __str__(self):
-#         return f"Tracking for {self.ride_match}"
-#
-# # Delivery Services Models
-# class Insurance(models.Model):
-#     travel_plan = models.OneToOneField(TravelPlan, on_delete=models.CASCADE, related_name='insurance')
-#     insurance_company = models.CharField(max_length=100)
-#     coverage_amount = models.DecimalField(max_digits=10, decimal_places=2)
-#     fee = models.DecimalField(max_digits=10, decimal_places=2)
-#
-#     def __str__(self):
-#         return f"Insurance for {self.travel_plan}"
-#
-# class DamageReport(models.Model):
-#     travel_plan = models.ForeignKey(TravelPlan, on_delete=models.CASCADE, related_name='damage_reports')
-#     description = models.TextField()
-#     reported_at = models.DateTimeField(auto_now_add=True)
-#     photo = models.ImageField(upload_to='damage_photos/', null=True, blank=True)
-#     video = models.FileField(upload_to='damage_videos/', null=True, blank=True)
-#
-#     def __str__(self):
-#         return f"Damage report for {self.travel_plan}"
-#
-# # Safety Features Models
-# class HomeAwayStatus(models.Model):
-#     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='home_away_status')
-#     is_home = models.BooleanField(default=True)
-#     location = models.CharField(max_length=100)
-#
-#     def __str__(self):
-#         return f"{self.user.username} - {'Home' if self.is_home else 'Away'}"
-#
-# class SOSAlert(models.Model):
-#     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='sos_alerts')
-#     ride = models.ForeignKey(RideMatch, on_delete=models.CASCADE, related_name='sos_alerts')
-#     message = models.CharField(max_length=255)
-#     sent_at = models.DateTimeField(auto_now_add=True)
-#     coordinates = models.CharField(max_length=100)
-#
-#     def __str__(self):
-#         return f"SOS Alert by {self.user.username}"
-#
-# class Badge(models.Model):
-#     name = models.CharField(max_length=100)
-#     description = models.TextField()
-#     icon = models.ImageField(upload_to='badge_icons/', null=True, blank=True)
-#     criteria = models.CharField(max_length=255)
-#
-#     def __str__(self):
-#         return self.name
-#
-# class UserBadge(models.Model):
-#     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='badges')
-#     badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
-#     awarded_at = models.DateTimeField(auto_now_add=True)
-#
-#     def __str__(self):
-#         return f"{self.user.username} - {self.badge.name}"
-#
-# class Review(models.Model):
-#     ride_match = models.ForeignKey(RideMatch, on_delete=models.CASCADE, related_name='reviews')
-#     reviewer = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='given_reviews')
-#     rating = models.IntegerField()
-#     comment = models.TextField()
-#     created_at = models.DateTimeField(auto_now_add=True)
-#
-#     def __str__(self):
-#         return f"Review by {self.reviewer.username} for {self.ride_match}"
+
+class Badge(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField()
+    icon = models.ImageField(upload_to='badge_icons/', null=True, blank=True)
+    criteria = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.name
+
+class UserBadge(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='badges')
+    badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
+    awarded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.badge.name}"
+
+
+class ReferralToken(models.Model):
+    """
+    Represents a unique referral token for a user.
+    """
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='referral_token'
+    )
+    token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s Referral Token"
+
+
+class Referral(models.Model):
+    """
+    Represents a referral made by a user using a referral token.
+    """
+    referred_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='referrals'
+    )
+    referred_user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='referred_details'
+    )
+    token_used = models.UUIDField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.referred_user.username} referred by {self.referred_by.username if self.referred_by else 'Unknown'}"
+
+    @staticmethod
+    def create_referral(referred_user, token):
+        """
+        Static method to create a referral.
+        """
+        try:
+            referrer = ReferralToken.objects.get(token=token).user
+        except ReferralToken.DoesNotExist:
+            referrer = None
+
+        Referral.objects.create(
+            referred_by=referrer,
+            referred_user=referred_user,
+            token_used=token
+        )
+
+

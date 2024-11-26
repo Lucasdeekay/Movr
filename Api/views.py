@@ -1035,7 +1035,12 @@ class SelectMoverView(APIView):
             qr_code.save()
 
             # Create a PackageOffer for the bid and associate the QR code
-            PackageOffer.objects.create(package_bid=bid, qr_code=qr_code)
+            package_offer = PackageOffer.objects.create(package_bid=bid, qr_code=qr_code)
+
+            if bid.package.package_type == 'Schedule':
+                package_offer.is_scheduled = True
+
+            package_offer.save()
 
             return Response({"message": f"{bid.mover.email} has been selected for the delivery."},
                             status=status.HTTP_200_OK)
@@ -1237,6 +1242,7 @@ class WalletDetailsView(APIView):
     """
     View to return wallet details and transactions of the authenticated user.
     """
+    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
@@ -1263,3 +1269,66 @@ class WalletDetailsView(APIView):
         except Exception as e:
             return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+class PickedUpPackageOffersView(APIView):
+    """
+    View to retrieve all package offers that have been picked up for the authenticated user.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = get_user_from_token(request)
+            package_offers = PackageOffer.objects.filter(
+                package_bid__package__user=user,
+                is_picked_up=True,
+                is_cancelled=False
+            )
+            serializer = PackageOfferSerializer(package_offers, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ScheduledPackageOffersView(APIView):
+    """
+    View to retrieve all scheduled package offers for the authenticated user.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = get_user_from_token(request)
+            package_offers = PackageOffer.objects.filter(
+                package_bid__package__user=user,
+                is_scheduled=True,
+                is_cancelled=False
+            )
+            serializer = PackageOfferSerializer(package_offers, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CancelPackageOfferView(APIView):
+    """
+    View to cancel a package offer for the authenticated user.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            user = get_user_from_token(request)
+            package_offer = PackageOffer.objects.get(
+                pk=pk,
+                package_bid__package__user=request.user,
+                is_cancelled=False
+            )
+            package_offer.is_cancelled = True
+            package_offer.save()
+            return Response({"detail": "Package offer cancelled successfully."}, status=status.HTTP_200_OK)
+        except PackageOffer.DoesNotExist:
+            return Response({"error": "Package offer not found or already cancelled."}, status=status.HTTP_404_NOT_FOUND)

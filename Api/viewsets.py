@@ -3,11 +3,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day, Wallet, Transaction, Transfer, WithdrawalRequest
+    Route, ScheduledRoute, Day, Wallet, Transaction, Transfer, WithdrawalRequest, Badge, UserBadge, ReferralToken, \
+    Referral
 from .serializers import CustomUserSerializer, KYCSerializer, VehicleSerializer, PaymentMethodSerializer, \
     SubscriptionPlanSerializer, SubscriptionSerializer, OTPSerializer, SocialMediaLinkSerializer, RouteSerializer, \
     ScheduledRouteSerializer, DaySerializer, WalletSerializer, TransactionSerializer, TransferSerializer, \
-    WithdrawalRequestSerializer
+    WithdrawalRequestSerializer, BadgeSerializer, UserBadgeSerializer, ReferralTokenSerializer, ReferralSerializer
 
 
 class CustomUserViewSet(viewsets.ModelViewSet):
@@ -105,85 +106,51 @@ class WithdrawalRequestViewSet(viewsets.ModelViewSet):
     serializer_class = WithdrawalRequestSerializer
 
 
-# from rest_framework import viewsets
-# from .models import (
-#     User, UserProfile, PaymentMethod, SubscriptionPlan, Subscription,
-#     TravelPlan, RideMatch, RideTracking, Insurance, DamageReport,
-#     KYC, HomeAwayStatus, SOSAlert, SocialLink, Badge, UserBadge, Review
-# )
-# from .serializers import (
-#     UserSerializer, UserProfileSerializer, PaymentMethodSerializer, SubscriptionPlanSerializer,
-#     SubscriptionSerializer, TravelPlanSerializer, RideMatchSerializer, RideTrackingSerializer,
-#     InsuranceSerializer, DamageReportSerializer, KYCSerializer, HomeAwayStatusSerializer,
-#     SOSAlertSerializer, SocialLinkSerializer, BadgeSerializer, UserBadgeSerializer, ReviewSerializer
-# )
-#
-# # User and Profile ViewSets
-# class UserViewSet(viewsets.ModelViewSet):
-#     queryset = User.objects.all()
-#     serializer_class = UserSerializer
-#
-# class UserProfileViewSet(viewsets.ModelViewSet):
-#     queryset = UserProfile.objects.all()
-#     serializer_class = UserProfileSerializer
-#
-# # Payment ViewSets
-# class PaymentMethodViewSet(viewsets.ModelViewSet):
-#     queryset = PaymentMethod.objects.all()
-#     serializer_class = PaymentMethodSerializer
-#
-# class SubscriptionPlanViewSet(viewsets.ModelViewSet):
-#     queryset = SubscriptionPlan.objects.all()
-#     serializer_class = SubscriptionPlanSerializer
-#
-# class SubscriptionViewSet(viewsets.ModelViewSet):
-#     queryset = Subscription.objects.all()
-#     serializer_class = SubscriptionSerializer
-#
-# # Travel and Ride ViewSets
-# class TravelPlanViewSet(viewsets.ModelViewSet):
-#     queryset = TravelPlan.objects.all()
-#     serializer_class = TravelPlanSerializer
-#
-# class RideMatchViewSet(viewsets.ModelViewSet):
-#     queryset = RideMatch.objects.all()
-#     serializer_class = RideMatchSerializer
-#
-# class RideTrackingViewSet(viewsets.ModelViewSet):
-#     queryset = RideTracking.objects.all()
-#     serializer_class = RideTrackingSerializer
-#
-# # Delivery ViewSets
-# class InsuranceViewSet(viewsets.ModelViewSet):
-#     queryset = Insurance.objects.all()
-#     serializer_class = InsuranceSerializer
-#
-# class DamageReportViewSet(viewsets.ModelViewSet):
-#     queryset = DamageReport.objects.all()
-#     serializer_class = DamageReportSerializer
-#
-# # Safety ViewSets
-# class KYCViewSet(viewsets.ModelViewSet):
-#     queryset = KYC.objects.all()
-#     serializer_class = KYCSerializer
-#
-# class HomeAwayStatusViewSet(viewsets.ModelViewSet):
-#     queryset = HomeAwayStatus.objects.all()
-#     serializer_class = HomeAwayStatusSerializer
-#
-# class SOSAlertViewSet(viewsets.ModelViewSet):
-#     queryset = SOSAlert.objects.all()
-#     serializer_class = SOSAlertSerializer
-#
-#
-# class BadgeViewSet(viewsets.ModelViewSet):
-#     queryset = Badge.objects.all()
-#     serializer_class = BadgeSerializer
-#
-# class UserBadgeViewSet(viewsets.ModelViewSet):
-#     queryset = UserBadge.objects.all()
-#     serializer_class = UserBadgeSerializer
-#
-# class ReviewViewSet(viewsets.ModelViewSet):
-#     queryset = Review.objects.all()
-#     serializer_class = ReviewSerializer
+
+class BadgeViewSet(viewsets.ModelViewSet):
+    """
+    A viewset for managing badges.
+    """
+    queryset = Badge.objects.all()
+    serializer_class = BadgeSerializer
+    permission_classes = [IsAuthenticated]  # Adjust permissions as needed
+
+
+class UserBadgeViewSet(viewsets.ModelViewSet):
+    """
+    A viewset for managing user badges.
+    """
+    serializer_class = UserBadgeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Ensure users can only see their own badges
+        return UserBadge.objects.filter(user=self.request.user)
+
+
+
+class ReferralTokenViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing referral tokens.
+    """
+    queryset = ReferralToken.objects.all()
+    serializer_class = ReferralTokenSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ReferralToken.objects.filter(user=self.request.user)
+
+
+class ReferralViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing referrals.
+    """
+    queryset = Referral.objects.all()
+    serializer_class = ReferralSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Referral.objects.filter(
+            referred_by=self.request.user
+        ) | Referral.objects.filter(referred_user=self.request.user)
+

@@ -2,7 +2,8 @@ from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
 from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, Wallet, Transaction, Transfer, WithdrawalRequest
+    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, Wallet, Transaction, Transfer, WithdrawalRequest, \
+    Badge, UserBadge, ReferralToken, Referral
 
 
 class TokenSerializer(serializers.ModelSerializer):
@@ -180,106 +181,47 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'user', 'status', 'reason', 'created_at', 'updated_at']
 
 
+class BadgeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Badge
+        fields = ['id', 'name', 'description', 'icon', 'criteria']
 
-# from rest_framework import serializers
-# from .models import (
-#     User, UserProfile, PaymentMethod, SubscriptionPlan, Subscription,
-#     TravelPlan, RideMatch, RideTracking, Insurance, DamageReport,
-#     KYC, HomeAwayStatus, SOSAlert, SocialLink, Badge, UserBadge, Review
-# )
-#
-# # User and Profile Serializers
-# class UserSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = User
-#         fields = '__all__'
-#
-# class UserProfileSerializer(serializers.ModelSerializer):
-#     user = UserSerializer()
-#
-#     class Meta:
-#         model = UserProfile
-#         fields = '__all__'
-#
-# # Payment Serializers
-# class PaymentMethodSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = PaymentMethod
-#         fields = '__all__'
-#
-# class SubscriptionPlanSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = SubscriptionPlan
-#         fields = '__all__'
-#
-# class SubscriptionSerializer(serializers.ModelSerializer):
-#     plan = SubscriptionPlanSerializer()
-#
-#     class Meta:
-#         model = Subscription
-#         fields = '__all__'
-#
-# # Travel and Ride Serializers
-# class TravelPlanSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = TravelPlan
-#         fields = '__all__'
-#
-# class RideMatchSerializer(serializers.ModelSerializer):
-#     travel_plan = TravelPlanSerializer()
-#
-#     class Meta:
-#         model = RideMatch
-#         fields = '__all__'
-#
-# class RideTrackingSerializer(serializers.ModelSerializer):
-#     ride_match = RideMatchSerializer()
-#
-#     class Meta:
-#         model = RideTracking
-#         fields = '__all__'
-#
-# # Delivery Serializers
-# class InsuranceSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Insurance
-#         fields = '__all__'
-#
-# class DamageReportSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = DamageReport
-#         fields = '__all__'
-#
-# # Safety Serializers
-# class KYCSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = KYC
-#         fields = '__all__'
-#
-# class HomeAwayStatusSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = HomeAwayStatus
-#         fields = '__all__'
-#
-# class SOSAlertSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = SOSAlert
-#         fields = '__all__'
-#
-#
-# class BadgeSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Badge
-#         fields = '__all__'
-#
-# class UserBadgeSerializer(serializers.ModelSerializer):
-#     badge = BadgeSerializer()
-#
-#     class Meta:
-#         model = UserBadge
-#         fields = '__all__'
-#
-# class ReviewSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Review
-#         fields = '__all__'
+
+class UserBadgeSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField(read_only=True)  # Or use a nested serializer for more details
+    badge = BadgeSerializer(read_only=True)
+
+    class Meta:
+        model = UserBadge
+        fields = ['id', 'user', 'badge', 'awarded_at']
+
+
+class ReferralTokenSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ReferralToken model.
+    """
+    class Meta:
+        model = ReferralToken
+        fields = ['user', 'token', 'created_at']
+        read_only_fields = ['token', 'created_at']
+
+
+class ReferralSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Referral model.
+    """
+    referred_by_username = serializers.CharField(
+        source='referred_by.username', read_only=True
+    )
+    referred_user_username = serializers.CharField(
+        source='referred_user.username', read_only=True
+    )
+
+    class Meta:
+        model = Referral
+        fields = [
+            'referred_by', 'referred_user', 'token_used',
+            'created_at', 'referred_by_username', 'referred_user_username'
+        ]
+        read_only_fields = ['created_at']
+

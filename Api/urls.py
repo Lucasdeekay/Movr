@@ -4,7 +4,8 @@ from .viewsets import (
     CustomUserViewSet, KYCViewSet, VehicleViewSet,
     PaymentMethodViewSet, SubscriptionPlanViewSet,
     SubscriptionViewSet, OTPViewSet, SocialMediaLinkViewSet, RouteViewSet, ScheduledRouteViewSet, DayViewSet,
-    WalletViewSet, TransactionViewSet, TransferViewSet, WithdrawalRequestViewSet
+    WalletViewSet, TransactionViewSet, TransferViewSet, WithdrawalRequestViewSet, BadgeViewSet, UserBadgeViewSet,
+    ReferralTokenViewSet, ReferralViewSet
 )
 from .views import (
     RegisterView,
@@ -15,7 +16,8 @@ from .views import (
     ResetPasswordView, UpdateKYCView, UpdateVehicleInfoView, UpdatePersonalInfoView, UpdateSubscriptionPlanView,
     CreateRouteView, CreateScheduledRouteView, UserRoutesView, ToggleIsLiveRouteView, PackageSubmissionView,
     PlaceBidView, PickupConfirmationView, DeliveryConfirmationView, SelectMoverView, GetAllBidsView, GetBidDetailView,
-    GetPackageOfferDetailView, ResendOTPView, DepositView, WithdrawView, WalletDetailsView
+    GetPackageOfferDetailView, ResendOTPView, DepositView, WithdrawView, WalletDetailsView, PickedUpPackageOffersView,
+    ScheduledPackageOffersView, CancelPackageOfferView
 )
 
 # Initialize the router
@@ -37,6 +39,10 @@ router.register(r'wallets', WalletViewSet, basename='wallet')
 router.register(r'transactions', TransactionViewSet, basename='transaction')
 router.register(r'transfer', TransferViewSet, basename='transfer')
 router.register(r'withdrawal-requests', WithdrawalRequestViewSet, basename='withdrawal-requests')
+router.register(r'badges', BadgeViewSet, basename='badge')
+router.register(r'user-badges', UserBadgeViewSet, basename='userbadge')
+router.register(r'referral-tokens', ReferralTokenViewSet, basename='referral-token')
+router.register(r'referrals', ReferralViewSet, basename='referral')
 
 # Include the router in your URL patterns
 urlpatterns = [
@@ -66,5 +72,8 @@ urlpatterns = [
     path('wallet/', WalletDetailsView.as_view(), name='wallet-details'),
     path("wallet/deposit/", DepositView.as_view(), name="wallet-deposit"),
     path("wallet/withdraw/", WithdrawView.as_view(), name="wallet-withdraw"),
+    path('offers/picked-up/', PickedUpPackageOffersView.as_view(), name='picked-up-package-offers'),
+    path('offers/scheduled/', ScheduledPackageOffersView.as_view(), name='scheduled-package-offers'),
+    path('offers/<int:pk>/cancel/', CancelPackageOfferView.as_view(), name='cancel-package-offer'),
     path('api/', include(router.urls)),
 ]
