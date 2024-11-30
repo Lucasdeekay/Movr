@@ -88,6 +88,11 @@ class RegisterView(APIView):
     creates a new user, initializes associated KYC, Vehicle, and Subscription objects,
     and sends an OTP for email verification. Rate limiting is applied to restrict
     the number of registration attempts from the same IP address.
+
+    data : {
+            "email": "newuser@example.com",
+            "password": "password123",
+        }
     """
 
     @csrf_exempt
@@ -140,6 +145,11 @@ class VerifyOTPView(APIView):
     It checks if the provided OTP is valid, not used, and not expired.
     If the OTP is valid, it marks it as used and updates the user's email verification status.
     Rate limiting is applied to restrict the number of verification attempts from the same IP address.
+
+    data : {
+            "email": email,
+            "code": code,
+        }
     """
 
     @csrf_exempt
@@ -206,6 +216,10 @@ class ResendOTPView(APIView):
         Response: A Django Rest Framework Response object.
             - If successful, returns a 200 OK status with a success message.
             - If the email is invalid, returns a 400 BAD REQUEST status with an error message.
+
+        data : {
+            "email": email,
+        }
         """
         email = request.data.get('email')
     
@@ -228,6 +242,11 @@ class LoginView(APIView):
     If the credentials are valid and the user's email is verified, a token is generated
     for the user, and their information is returned in the response. Rate limiting is applied
     to restrict the number of login attempts from the same IP address.
+
+    data : {
+            'email': email,
+            'password': 'password123'
+        }
     """
 
     @csrf_exempt
@@ -304,6 +323,8 @@ class ForgotPasswordRequestOTPView(APIView):
     This view handles the process of generating a password reset token
     and sending a reset link to the user's registered email address.
     Rate limiting is applied to restrict the number of requests from the same IP address.
+
+    data : {'email': .email}
     """
 
     @csrf_exempt
@@ -355,6 +376,13 @@ class ResetPasswordView(APIView):
     user ID, and updates the password if the token is valid.
     Rate limiting is applied to restrict the number of requests
     from the same IP address.
+
+    data : {
+            'uid': self.uid,
+            'token': self.token,
+            'new_password': 'newpassword123',
+            'confirm_password': 'newpassword123'
+        }
     """
 
     @csrf_exempt
@@ -407,6 +435,13 @@ class UpdateKYCView(APIView):
     If no KYC record exists for the user, a new one is created.
     The view utilizes token-based authentication to ensure that only
     authenticated users can access this endpoint.
+
+    data : {
+            "bvn": "98765432101",
+            "nin": "98765432101",
+            "driver_license": mock_image,
+            "verified": False
+        }
     """
 
     authentication_classes = [TokenAuthentication]
@@ -483,6 +518,17 @@ class UpdateVehicleInfoView(APIView):
 
     This view allows authenticated users to update their vehicle details.
     If no vehicle record exists for the user, a new one is created.
+
+    data : {
+            "vehicle_plate_number": "XYZ987ABC",
+            "vehicle_type": "Truck",
+            "vehicle_brand": "Ford",
+            "vehicle_color": "Blue",
+            "vehicle_photo": mock_image,
+            "driver_license": mock_image,
+            "vehicle_inspector_report": mock_image,
+            "vehicle_insurance": mock_image
+        }
     """
 
     authentication_classes = [TokenAuthentication]
@@ -569,6 +615,15 @@ class UpdatePersonalInfoView(APIView):
     """
     API view for updating a user's personal information and social media links.
     This view handles proper error responses for invalid inputs and constraints.
+
+    data : {
+            'first_name': 'John',
+            'last_name': 'Doe',
+            'phone_number': '0987654321',
+            'facebook': 'https://facebook.com/newuser',
+            'instagram': 'https://instagram.com/newuser',
+            'linkedin': 'https://linkedin.com/in/newuser',
+        }
     """
 
     authentication_classes = [TokenAuthentication]
@@ -658,6 +713,8 @@ class UpdateSubscriptionPlanView(APIView):
     This view allows authenticated users to update their subscription plan
     based on the provided plan name. The view utilizes token-based
     authentication to ensure that only authenticated users can access this endpoint.
+
+    data : {'plan_name': 'premium'}
     """
 
     authentication_classes = [TokenAuthentication]
@@ -707,6 +764,18 @@ class CreateRouteView(APIView):
     the necessary details such as location, destination, transportation mode,
     and departure time. The view utilizes token-based authentication to ensure
     that only authenticated users can access this endpoint.
+
+    data : {
+            "location": "Location A",
+            "location_latitude": 40.712776,
+            "location_longitude": -74.005974,
+            "destination": "Location B",
+            "destination_latitude": 34.052235,
+            "destination_longitude": -118.243683,
+            "transportation_mode": "car",
+            "departure_time": timezone.now().isoformat(),
+            "service_type": "ride",
+        }
     """
 
     authentication_classes = [TokenAuthentication]
@@ -775,6 +844,21 @@ class CreateScheduledRouteView(APIView):
     necessary details such as location, destination, transportation mode, and schedule
     information. The view utilizes token-based authentication to ensure that only
     authenticated users can access this endpoint.
+
+    data : {
+            "location": "Location A",
+            "location_latitude": 40.712776,
+            "location_longitude": -74.005974,
+            "destination": "Location B",
+            "destination_latitude": 34.052235,
+            "destination_longitude": -118.243683,
+            "transportation_mode": "car",
+            "departure_time": timezone.now().isoformat(),
+            "is_returning": "True",
+            "returning_time": timezone.now().isoformat(),
+            "is_repeated": "True",
+            "days_of_week": [self.monday.id, self.tuesday.id],
+        }
     """
 
     authentication_classes = [TokenAuthentication]
@@ -927,10 +1011,38 @@ class ToggleIsLiveRouteView(APIView):
 
 
 class PackageSubmissionView(APIView):
+    """
+    data : {
+            "location": "Origin City",
+            "location_latitude": Decimal("40.712776"),
+            "location_longitude": Decimal("-74.005974"),
+            "destination": "Destination City",
+            "destination_latitude": Decimal("34.052235"),
+            "destination_longitude": Decimal("-118.243683"),
+            "package_type": "Delivery",
+            "item_image": item_image,
+            "item_description": "Books and gadgets",
+            "item_weight": "medium",
+            "receiver_name": "John Doe",
+            "receiver_phone_number": "1234567890",
+            "range_radius": Decimal("10.00"),
+        }
+    """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        """
+        Handle POST requests to submit a package.
+
+        Args:
+            request: The HTTP request object containing the package details.
+
+        Returns:
+            Response: A Response object containing the serialized package data if the submission is successful,
+                      with a status code of 201 (Created). If the submission fails, a 400 error response is returned
+                      containing the errors.
+        """
         user = get_user_from_token(request)
         serializer = PackageSerializer(data=request.data)
         if serializer.is_valid():
@@ -940,10 +1052,38 @@ class PackageSubmissionView(APIView):
 
 
 class PlaceBidView(APIView):
+    """
+    data : {
+            "price": Decimal("10.00")
+        }
+    """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
+
     def post(self, request, package_id):
+        """
+        Handle POST requests to place a bid on a package.
+
+        This method allows an authenticated user to place a bid 
+        on a specific package identified by its ID. The user must 
+        provide a price for the bid.
+
+        Args:
+            request: The HTTP request object containing the user's 
+                     authentication token and bid price.
+            package_id: The ID of the package on which the bid is 
+                        being placed.
+
+        Returns:
+            Response: A Response object containing a success message 
+                      and the ID of the newly created bid if the bid 
+                      is placed successfully, with a status code of 
+                      201 (Created). If the price is not provided, 
+                      a 400 error response is returned. If the package
+                      is not found, a 404 error response is returned.
+        """
+
         mover = get_user_from_token(request)
         price = request.data.get('price')
 
@@ -1067,6 +1207,9 @@ class GetPackageOfferDetailView(APIView):
 
 
 class PickupConfirmationView(APIView):
+    """
+    data : {'code': '12345'}
+    """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -1084,6 +1227,9 @@ class PickupConfirmationView(APIView):
 
 
 class DeliveryConfirmationView(APIView):
+    """
+    data : {'code': '12345'}
+    """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
