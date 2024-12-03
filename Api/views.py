@@ -14,7 +14,7 @@ from django_ratelimit.decorators import ratelimit
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework.decorators import permission_classes
+# from rest_framework.decorators import permission_classes
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
@@ -294,7 +294,7 @@ class LogoutView(APIView):
     """
 
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -445,7 +445,7 @@ class UpdateKYCView(APIView):
     """
 
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         """
@@ -532,7 +532,7 @@ class UpdateVehicleInfoView(APIView):
     """
 
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         """
@@ -627,7 +627,7 @@ class UpdatePersonalInfoView(APIView):
     """
 
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]  # To handle file uploads
 
     def post(self, request, *args, **kwargs):
@@ -718,7 +718,7 @@ class UpdateSubscriptionPlanView(APIView):
     """
 
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def put(self, request, *args, **kwargs):
         """
@@ -779,7 +779,7 @@ class CreateRouteView(APIView):
     """
 
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -862,7 +862,7 @@ class CreateScheduledRouteView(APIView):
     """
 
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -956,7 +956,7 @@ class UserRoutesView(APIView):
     """
 
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         """
@@ -977,7 +977,7 @@ class UserRoutesView(APIView):
 
 class ToggleIsLiveRouteView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def post(self, request, route_id):
         """
@@ -1029,7 +1029,7 @@ class PackageSubmissionView(APIView):
         }
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
@@ -1058,7 +1058,7 @@ class PlaceBidView(APIView):
         }
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
 
     def post(self, request, package_id):
@@ -1107,7 +1107,7 @@ class PlaceBidView(APIView):
 
 class GetAllBidsView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def get(self, request, package_id):
         try:
@@ -1131,7 +1131,7 @@ class GetAllBidsView(APIView):
 
 class GetBidDetailView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def get(self, request, bid_id):
         try:
@@ -1153,7 +1153,7 @@ class GetBidDetailView(APIView):
 
 class SelectMoverView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def post(self, request, bid_id):
         try:
@@ -1191,7 +1191,7 @@ class SelectMoverView(APIView):
 
 class GetPackageOfferDetailView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def get(self, request, package_offer_id):
         try:
@@ -1211,7 +1211,7 @@ class PickupConfirmationView(APIView):
     data : {'code': '12345'}
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def post(self, request, package_offer_id):
         package_offer = PackageOffer.objects.get(id=package_offer_id)
@@ -1231,7 +1231,7 @@ class DeliveryConfirmationView(APIView):
     data : {'code': '12345'}
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def post(self, request, package_offer_id):
         package_offer = PackageOffer.objects.get(id=package_offer_id)
@@ -1251,7 +1251,7 @@ class DepositView(APIView):
     View to handle wallet deposits.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         try:
@@ -1299,7 +1299,7 @@ class WithdrawView(APIView):
     View to handle wallet withdrawal requests.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         try:
@@ -1389,7 +1389,7 @@ class WalletDetailsView(APIView):
     View to return wallet details and transactions of the authenticated user.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         try:
@@ -1421,7 +1421,7 @@ class PickedUpPackageOffersView(APIView):
     View to retrieve all package offers that have been picked up for the authenticated user.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
@@ -1442,7 +1442,7 @@ class ScheduledPackageOffersView(APIView):
     View to retrieve all scheduled package offers for the authenticated user.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
@@ -1463,7 +1463,7 @@ class CancelPackageOfferView(APIView):
     View to cancel a package offer for the authenticated user.
     """
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+#     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
         try:

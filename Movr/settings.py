@@ -42,8 +42,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
-    'coreapi',  # Coreapi for coreapi documentation
-    'drf_yasg',  # drf_yasg fro Swagger documentation
+    # 'coreapi',  # Coreapi for coreapi documentation
+    # 'drf_yasg',  # drf_yasg fro Swagger documentation
     'channels',
     'Api',
 ]
