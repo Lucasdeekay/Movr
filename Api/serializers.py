@@ -1,9 +1,10 @@
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
+from decimal import Decimal
 
 from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
     Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, Wallet, Transaction, Transfer, WithdrawalRequest, \
-    Badge, UserBadge, ReferralToken, Referral
+    Badge, UserBadge, ReferralToken, Referral, PaystackAccount, PaystackTransaction
 
 
 class TokenSerializer(serializers.ModelSerializer):
@@ -41,6 +42,90 @@ class PaymentMethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentMethod
         fields = '__all__'
+
+# Paystack Serializers
+class PaystackAccountSerializer(serializers.ModelSerializer):
+    user = CustomUserSerializer(read_only=True)
+    
+    class Meta:
+        model = PaystackAccount
+        fields = [
+            'id', 'user', 'account_type', 'account_number', 'bank_name', 
+            'bank_code', 'status', 'is_active', 'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'user', 'account_number', 'bank_name', 'bank_code', 
+            'paystack_customer_code', 'paystack_account_id', 'status', 
+            'is_active', 'created_at', 'updated_at'
+        ]
+
+
+class PaystackTransactionSerializer(serializers.ModelSerializer):
+    user = CustomUserSerializer(read_only=True)
+    
+    class Meta:
+        model = PaystackTransaction
+        fields = [
+            'id', 'user', 'transaction_type', 'paystack_reference', 
+            'paystack_transaction_id', 'amount', 'currency', 'status',
+            'gateway_response', 'channel', 'ip_address', 'narration',
+            'fees', 'paid_at', 'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'user', 'paystack_reference', 'paystack_transaction_id',
+            'gateway_response', 'channel', 'ip_address', 'fees', 
+            'paid_at', 'created_at', 'updated_at'
+        ]
+
+
+class CreatePaystackAccountSerializer(serializers.Serializer):
+    """
+    Serializer for creating Paystack DVA account
+    """
+    preferred_bank = serializers.CharField(required=False, allow_blank=True)
+
+
+class PaystackDepositSerializer(serializers.Serializer):
+    """
+    Serializer for Paystack deposit
+    """
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('100.00'))
+    email = serializers.EmailField()
+    reference = serializers.CharField(required=False, allow_blank=True)
+    callback_url = serializers.URLField(required=False, allow_blank=True)
+
+
+class PaystackWithdrawalSerializer(serializers.Serializer):
+    """
+    Serializer for Paystack withdrawal
+    """
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('100.00'))
+    bank_code = serializers.CharField(max_length=10)
+    account_number = serializers.CharField(max_length=20)
+    account_name = serializers.CharField(max_length=100)
+    narration = serializers.CharField(required=False, allow_blank=True)
+
+
+class BankSerializer(serializers.Serializer):
+    """
+    Serializer for bank information
+    """
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    code = serializers.CharField()
+    active = serializers.BooleanField()
+    country = serializers.CharField()
+    currency = serializers.CharField()
+    type = serializers.CharField()
+
+
+class ResolveAccountSerializer(serializers.Serializer):
+    """
+    Serializer for resolving account number
+    """
+    account_number = serializers.CharField(max_length=20)
+    bank_code = serializers.CharField(max_length=10)
+
 
 class SubscriptionPlanSerializer(serializers.ModelSerializer):
     class Meta:

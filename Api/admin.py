@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
     Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, Wallet, Transaction, Transfer, WithdrawalRequest, \
-    Badge, UserBadge, ReferralToken, Referral
+    Badge, UserBadge, ReferralToken, Referral, PaystackAccount, PaystackTransaction
 
 
 @admin.register(CustomUser)
@@ -32,6 +32,23 @@ class VehicleAdmin(admin.ModelAdmin):
 class PaymentMethodAdmin(admin.ModelAdmin):
     list_display = ('user', 'method_name', 'account_details')
     search_fields = ('user__email', 'method_name')
+
+# Paystack Admin
+@admin.register(PaystackAccount)
+class PaystackAccountAdmin(admin.ModelAdmin):
+    list_display = ('user', 'account_type', 'account_number', 'bank_name', 'status', 'is_active', 'created_at')
+    search_fields = ('user__email', 'account_number', 'bank_name')
+    list_filter = ('account_type', 'status', 'is_active', 'created_at')
+    readonly_fields = ('paystack_customer_code', 'paystack_account_id', 'created_at', 'updated_at')
+    ordering = ('-created_at',)
+
+@admin.register(PaystackTransaction)
+class PaystackTransactionAdmin(admin.ModelAdmin):
+    list_display = ('user', 'transaction_type', 'paystack_reference', 'amount', 'status', 'created_at')
+    search_fields = ('user__email', 'paystack_reference', 'paystack_transaction_id')
+    list_filter = ('transaction_type', 'status', 'currency', 'created_at')
+    readonly_fields = ('paystack_reference', 'paystack_transaction_id', 'gateway_response', 'fees', 'paid_at', 'created_at', 'updated_at')
+    ordering = ('-created_at',)
 
 @admin.register(SubscriptionPlan)
 class SubscriptionPlanAdmin(admin.ModelAdmin):
@@ -114,19 +131,16 @@ class TransferAdmin(admin.ModelAdmin):
     search_fields = ("sender__email", "recipient__email")
     ordering = ("-timestamp",)
 
-
 @admin.register(WithdrawalRequest)
 class WithdrawalRequestAdmin(admin.ModelAdmin):
     list_display = ['id', 'user', 'amount', 'bank_name', 'account_number', 'status', 'created_at']
     list_filter = ['status', 'created_at']
     search_fields = ['user__email', 'bank_name', 'account_number', 'amount', 'status']
 
-
 @admin.register(Badge)
 class BadgeAdmin(admin.ModelAdmin):
     list_display = ('name', 'criteria')
     search_fields = ('name', 'criteria')
-
 
 @admin.register(UserBadge)
 class UserBadgeAdmin(admin.ModelAdmin):
@@ -134,13 +148,11 @@ class UserBadgeAdmin(admin.ModelAdmin):
     search_fields = ('user__username', 'badge__name')
     list_filter = ('awarded_at',)
 
-
 @admin.register(ReferralToken)
 class ReferralTokenAdmin(admin.ModelAdmin):
     list_display = ('user', 'token', 'created_at')
     search_fields = ('user__username', 'token')
     readonly_fields = ('token', 'created_at')
-
 
 @admin.register(Referral)
 class ReferralAdmin(admin.ModelAdmin):

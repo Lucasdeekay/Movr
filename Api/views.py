@@ -23,11 +23,13 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import TokenAuthentication
 from .models import Route, ScheduledRoute, Day, Package, Bid, PackageOffer, QRCode, Wallet, Transaction, \
-    WithdrawalRequest
+    WithdrawalRequest, PaystackAccount, PaystackTransaction
 from .models import CustomUser, KYC, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink
 from .serializers import CustomUserSerializer, OTPVerificationSerializer, TokenSerializer, VehicleSerializer, \
     KYCSerializer, SocialMediaLinkSerializer, RouteSerializer, ScheduledRouteSerializer, PackageSerializer, \
-    BidSerializer, PackageOfferSerializer, WalletSerializer, TransactionSerializer, WithdrawalRequestSerializer
+    BidSerializer, PackageOfferSerializer, WalletSerializer, TransactionSerializer, WithdrawalRequestSerializer, \
+    PaystackAccountSerializer, PaystackTransactionSerializer, CreatePaystackAccountSerializer, \
+    PaystackDepositSerializer, PaystackWithdrawalSerializer, BankSerializer, ResolveAccountSerializer
 from rest_framework.authtoken.models import Token
 import random
 
@@ -1469,12 +1471,311 @@ class CancelPackageOfferView(APIView):
         try:
             user = get_user_from_token(request)
             package_offer = PackageOffer.objects.get(
-                pk=pk,
-                package_bid__package__user=request.user,
-                is_cancelled=False
+                id=pk,
+                package_bid__package__user=user
             )
             package_offer.is_cancelled = True
             package_offer.save()
-            return Response({"detail": "Package offer cancelled successfully."}, status=status.HTTP_200_OK)
+            return Response({"message": "Package offer cancelled successfully."}, status=status.HTTP_200_OK)
         except PackageOffer.DoesNotExist:
-            return Response({"error": "Package offer not found or already cancelled."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Package offer not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# Paystack Views
+class PaystackAccountView(APIView):
+    """
+    View to handle Paystack DVA account operations
+    """
+    authentication_classes = [TokenAuthentication]
+    
+    def get(self, request):
+        """Get user's Paystack account details"""
+        try:
+            user = get_user_from_token(request)
+            try:
+                account = PaystackAccount.objects.get(user=user)
+                serializer = PaystackAccountSerializer(account)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            except PaystackAccount.DoesNotExist:
+                return Response({"message": "No Paystack account found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def post(self, request):
+        """Create a new Paystack DVA account"""
+        try:
+            user = get_user_from_token(request)
+            serializer = CreatePaystackAccountSerializer(data=request.data)
+            
+            if serializer.is_valid():
+                # Check if user already has an account
+                if PaystackAccount.objects.filter(user=user).exists():
+                    return Response({"error": "User already has a Paystack account"}, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Create DVA account using Paystack service
+                from .paystack_service import paystack_service
+                success, response = paystack_service.create_dva_account(
+                    user=user,
+                    preferred_bank=serializer.validated_data.get('preferred_bank')
+                )
+                
+                if success:
+                    account = PaystackAccount.objects.get(user=user)
+                    account_serializer = PaystackAccountSerializer(account)
+                    return Response({
+                        "message": "Paystack account created successfully",
+                        "account": account_serializer.data
+                    }, status=status.HTTP_201_CREATED)
+                else:
+                    return Response({"error": response.get('error', 'Failed to create account')}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PaystackDepositView(APIView):
+    """
+    View to handle Paystack deposits
+    """
+    authentication_classes = [TokenAuthentication]
+    
+    def post(self, request):
+        """Initiate a Paystack deposit"""
+        try:
+            user = get_user_from_token(request)
+            serializer = PaystackDepositSerializer(data=request.data)
+            
+            if serializer.is_valid():
+                amount = serializer.validated_data['amount']
+                email = serializer.validated_data['email']
+                reference = serializer.validated_data.get('reference')
+                callback_url = serializer.validated_data.get('callback_url')
+                
+                # Create transaction record
+                transaction = PaystackTransaction.objects.create(
+                    user=user,
+                    transaction_type='deposit',
+                    paystack_reference=reference or f"DEP_{user.id}_{int(timezone.now().timestamp())}",
+                    amount=amount,
+                    status='pending'
+                )
+                
+                # Initialize Paystack transaction
+                from .paystack_service import paystack_service
+                import uuid
+                
+                # Generate unique reference if not provided
+                if not reference:
+                    reference = f"DEP_{user.id}_{uuid.uuid4().hex[:8]}"
+                    transaction.paystack_reference = reference
+                    transaction.save()
+                
+                # Create Paystack transaction data
+                transaction_data = {
+                    'email': email,
+                    'amount': int(amount * 100),  # Convert to kobo
+                    'reference': reference,
+                    'callback_url': callback_url or f"{request.build_absolute_uri('/')}api/paystack/webhook/",
+                    'currency': 'NGN'
+                }
+                
+                # Make request to Paystack
+                success, response = paystack_service._make_request('POST', '/transaction/initialize', transaction_data)
+                
+                if success:
+                    return Response({
+                        "message": "Deposit initiated successfully",
+                        "authorization_url": response.get('data', {}).get('authorization_url'),
+                        "reference": reference,
+                        "transaction_id": transaction.id
+                    }, status=status.HTTP_200_OK)
+                else:
+                    transaction.status = 'failed'
+                    transaction.gateway_response = response.get('error', 'Failed to initialize transaction')
+                    transaction.save()
+                    return Response({"error": response.get('error', 'Failed to initialize deposit')}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PaystackWithdrawalView(APIView):
+    """
+    View to handle Paystack withdrawals
+    """
+    authentication_classes = [TokenAuthentication]
+    
+    def post(self, request):
+        """Initiate a Paystack withdrawal"""
+        try:
+            user = get_user_from_token(request)
+            serializer = PaystackWithdrawalSerializer(data=request.data)
+            
+            if serializer.is_valid():
+                amount = serializer.validated_data['amount']
+                bank_code = serializer.validated_data['bank_code']
+                account_number = serializer.validated_data['account_number']
+                account_name = serializer.validated_data['account_name']
+                narration = serializer.validated_data.get('narration', 'Withdrawal')
+                
+                # Check if user has sufficient balance
+                wallet, created = Wallet.objects.get_or_create(user=user)
+                if wallet.balance < amount:
+                    return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Create recipient first
+                from .paystack_service import paystack_service
+                success, recipient_response = paystack_service.create_recipient(
+                    account_number=account_number,
+                    bank_code=bank_code,
+                    name=account_name
+                )
+                
+                if not success:
+                    return Response({"error": "Failed to create recipient"}, status=status.HTTP_400_BAD_REQUEST)
+                
+                recipient_code = recipient_response.get('data', {}).get('recipient_code')
+                
+                # Create transaction record
+                import uuid
+                reference = f"WTH_{user.id}_{uuid.uuid4().hex[:8]}"
+                transaction = PaystackTransaction.objects.create(
+                    user=user,
+                    transaction_type='withdrawal',
+                    paystack_reference=reference,
+                    amount=amount,
+                    status='pending',
+                    narration=narration
+                )
+                
+                # Initiate transfer
+                success, transfer_response = paystack_service.initiate_transfer(
+                    recipient_code=recipient_code,
+                    amount=amount,
+                    reason=narration
+                )
+                
+                if success:
+                    transfer_data = transfer_response.get('data', {})
+                    transaction.paystack_transaction_id = transfer_data.get('id')
+                    transaction.save()
+                    
+                    # Deduct from wallet
+                    wallet.withdraw(amount)
+                    
+                    return Response({
+                        "message": "Withdrawal initiated successfully",
+                        "reference": reference,
+                        "transaction_id": transaction.id
+                    }, status=status.HTTP_200_OK)
+                else:
+                    transaction.status = 'failed'
+                    transaction.gateway_response = transfer_response.get('error', 'Failed to initiate transfer')
+                    transaction.save()
+                    return Response({"error": transfer_response.get('error', 'Failed to initiate withdrawal')}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PaystackWebhookView(APIView):
+    """
+    View to handle Paystack webhooks
+    """
+    authentication_classes = []
+    permission_classes = []
+    
+    def post(self, request):
+        """Handle Paystack webhook"""
+        try:
+            # Get the signature from headers
+            signature = request.headers.get('X-Paystack-Signature')
+            if not signature:
+                return Response({"error": "No signature provided"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Process webhook
+            from .paystack_service import paystack_service
+            success = paystack_service.process_webhook(request.data, signature)
+            
+            if success:
+                return Response({"status": "success"}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Webhook processing failed"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PaystackBanksView(APIView):
+    """
+    View to get list of available banks
+    """
+    authentication_classes = [TokenAuthentication]
+    
+    def get(self, request):
+        """Get list of available banks"""
+        try:
+            from .paystack_service import paystack_service
+            success, response = paystack_service.get_banks()
+            
+            if success:
+                banks = response.get('data', [])
+                return Response({"banks": banks}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": response.get('error', 'Failed to fetch banks')}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PaystackResolveAccountView(APIView):
+    """
+    View to resolve account number
+    """
+    authentication_classes = [TokenAuthentication]
+    
+    def post(self, request):
+        """Resolve account number to get account details"""
+        try:
+            serializer = ResolveAccountSerializer(data=request.data)
+            
+            if serializer.is_valid():
+                account_number = serializer.validated_data['account_number']
+                bank_code = serializer.validated_data['bank_code']
+                
+                from .paystack_service import paystack_service
+                success, response = paystack_service.resolve_account_number(account_number, bank_code)
+                
+                if success:
+                    account_data = response.get('data', {})
+                    return Response({
+                        "account_name": account_data.get('account_name'),
+                        "account_number": account_data.get('account_number'),
+                        "bank_id": account_data.get('bank_id')
+                    }, status=status.HTTP_200_OK)
+                else:
+                    return Response({"error": response.get('error', 'Failed to resolve account')}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PaystackTransactionsView(APIView):
+    """
+    View to get user's Paystack transactions
+    """
+    authentication_classes = [TokenAuthentication]
+    
+    def get(self, request):
+        """Get user's Paystack transactions"""
+        try:
+            user = get_user_from_token(request)
+            transactions = PaystackTransaction.objects.filter(user=user).order_by('-created_at')
+            serializer = PaystackTransactionSerializer(transactions, many=True)
+            return Response({"transactions": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

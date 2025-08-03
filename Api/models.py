@@ -106,6 +106,86 @@ class PaymentMethod(models.Model):
         return f"{self.method_name} - {self.user.username}"
 
 
+# Paystack DVA Models
+class PaystackAccount(models.Model):
+    """
+    Model to store Paystack DVA (Direct Virtual Account) information
+    """
+    ACCOUNT_TYPE_CHOICES = [
+        ('dva', 'Direct Virtual Account'),
+        ('standard', 'Standard Account'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+        ('pending', 'Pending'),
+        ('suspended', 'Suspended'),
+    ]
+    
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='paystack_account')
+    account_type = models.CharField(max_length=20, choices=ACCOUNT_TYPE_CHOICES, default='dva')
+    account_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    bank_name = models.CharField(max_length=100, null=True, blank=True)
+    bank_code = models.CharField(max_length=10, null=True, blank=True)
+    paystack_customer_code = models.CharField(max_length=100, null=True, blank=True)
+    paystack_account_id = models.CharField(max_length=100, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    is_active = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Paystack Account for {self.user.email} - {self.account_number}"
+    
+    class Meta:
+        verbose_name = "Paystack Account"
+        verbose_name_plural = "Paystack Accounts"
+
+
+class PaystackTransaction(models.Model):
+    """
+    Model to track Paystack transactions
+    """
+    TRANSACTION_TYPE_CHOICES = [
+        ('deposit', 'Deposit'),
+        ('withdrawal', 'Withdrawal'),
+        ('transfer', 'Transfer'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('success', 'Success'),
+        ('failed', 'Failed'),
+        ('abandoned', 'Abandoned'),
+        ('reversed', 'Reversed'),
+    ]
+    
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='paystack_transactions')
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES)
+    paystack_reference = models.CharField(max_length=100, unique=True)
+    paystack_transaction_id = models.CharField(max_length=100, null=True, blank=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=3, default='NGN')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    gateway_response = models.TextField(null=True, blank=True)
+    channel = models.CharField(max_length=50, null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    narration = models.CharField(max_length=255, null=True, blank=True)
+    fees = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    paid_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.user.email} - {self.transaction_type} - {self.amount} ({self.status})"
+    
+    class Meta:
+        verbose_name = "Paystack Transaction"
+        verbose_name_plural = "Paystack Transactions"
+        ordering = ['-created_at']
+
+
 class SubscriptionPlan(models.Model):
     NAME_CHOICES = (
         ('free', 'FREE'),
@@ -312,7 +392,6 @@ class PackageOffer(models.Model):
 
     def __str__(self):
         return f"Package Offer for {self.package_bid.package.location} to {self.package_bid.package.destination}"
-
 
 
 class Wallet(models.Model):

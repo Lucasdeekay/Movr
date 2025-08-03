@@ -4,11 +4,12 @@ from rest_framework.response import Response
 
 from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
     Route, ScheduledRoute, Day, Wallet, Transaction, Transfer, WithdrawalRequest, Badge, UserBadge, ReferralToken, \
-    Referral
+    Referral, PaystackAccount, PaystackTransaction
 from .serializers import CustomUserSerializer, KYCSerializer, VehicleSerializer, PaymentMethodSerializer, \
     SubscriptionPlanSerializer, SubscriptionSerializer, OTPSerializer, SocialMediaLinkSerializer, RouteSerializer, \
     ScheduledRouteSerializer, DaySerializer, WalletSerializer, TransactionSerializer, TransferSerializer, \
-    WithdrawalRequestSerializer, BadgeSerializer, UserBadgeSerializer, ReferralTokenSerializer, ReferralSerializer
+    WithdrawalRequestSerializer, BadgeSerializer, UserBadgeSerializer, ReferralTokenSerializer, ReferralSerializer, \
+    PaystackAccountSerializer, PaystackTransactionSerializer
 
 
 class CustomUserViewSet(viewsets.ModelViewSet):
@@ -30,6 +31,35 @@ class VehicleViewSet(viewsets.ModelViewSet):
 class PaymentMethodViewSet(viewsets.ModelViewSet):
     queryset = PaymentMethod.objects.all()
     serializer_class = PaymentMethodSerializer
+
+# Paystack Viewsets
+class PaystackAccountViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet to manage Paystack accounts.
+    """
+    serializer_class = PaystackAccountSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return PaystackAccount.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class PaystackTransactionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet to manage Paystack transactions.
+    """
+    serializer_class = PaystackTransactionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return PaystackTransaction.objects.filter(user=self.request.user).order_by('-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
 
 class SubscriptionPlanViewSet(viewsets.ModelViewSet):
     queryset = SubscriptionPlan.objects.all()
@@ -98,14 +128,11 @@ class TransferViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Transfer.objects.filter(sender=self.request.user).order_by("-timestamp")
-
+        return Transfer.objects.filter(sender=self.request.user) | Transfer.objects.filter(recipient=self.request.user)
 
 class WithdrawalRequestViewSet(viewsets.ModelViewSet):
     queryset = WithdrawalRequest.objects.all()
     serializer_class = WithdrawalRequestSerializer
-
-
 
 class BadgeViewSet(viewsets.ModelViewSet):
     """
@@ -114,7 +141,6 @@ class BadgeViewSet(viewsets.ModelViewSet):
     queryset = Badge.objects.all()
     serializer_class = BadgeSerializer
     permission_classes = [IsAuthenticated]  # Adjust permissions as needed
-
 
 class UserBadgeViewSet(viewsets.ModelViewSet):
     """
@@ -127,8 +153,6 @@ class UserBadgeViewSet(viewsets.ModelViewSet):
         # Ensure users can only see their own badges
         return UserBadge.objects.filter(user=self.request.user)
 
-
-
 class ReferralTokenViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing referral tokens.
@@ -140,7 +164,6 @@ class ReferralTokenViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return ReferralToken.objects.filter(user=self.request.user)
 
-
 class ReferralViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing referrals.
@@ -150,7 +173,5 @@ class ReferralViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Referral.objects.filter(
-            referred_by=self.request.user
-        ) | Referral.objects.filter(referred_user=self.request.user)
+        return Referral.objects.filter(referred_by=self.request.user)
 

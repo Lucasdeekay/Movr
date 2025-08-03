@@ -222,3 +222,10 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+# Paystack Configuration
+PAYSTACK_SECRET_KEY = config('PAYSTACK_SECRET_KEY', default='')
+PAYSTACK_PUBLIC_KEY = config('PAYSTACK_PUBLIC_KEY', default='')
+PAYSTACK_SUBACCOUNT_CODE = config('PAYSTACK_SUBACCOUNT_CODE', default='')
+PAYSTACK_SPLIT_CODE = config('PAYSTACK_SPLIT_CODE', default='')
+PAYSTACK_WEBHOOK_SECRET = config('PAYSTACK_WEBHOOK_SECRET', default='')
