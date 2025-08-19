@@ -4,6 +4,8 @@ from rest_framework.response import Response
 
 from rest_framework.filters import SearchFilter, OrderingFilter
 
+from django_filters.rest_framework import DjangoFilterBackend
+
 from .models import CustomUser, KYC, Notification, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
     Route, ScheduledRoute, Day, Badge, UserBadge, ReferralToken, Referral
 from .serializers import CustomUserSerializer, KYCSerializer, NotificationSerializer, VehicleSerializer, \
@@ -112,7 +114,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
     Provides CRUD operations for notifications with user-specific filtering.
     """
     serializer_class = NotificationSerializer
-    filter_backends = (SearchFilter, OrderingFilter)
+    filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter)
     filterset_fields = ['is_read', 'created_at']
     search_fields = ['title', 'message']
     ordering_fields = ['created_at', 'is_read']
