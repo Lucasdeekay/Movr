@@ -38,6 +38,7 @@ from rest_framework.documentation import include_docs_urls
 urlpatterns = [
     path('manager/', admin.site.urls),
     path('', include('Api.urls')),
+    path('wallet', include('wallet.urls')),
     # path('docs/', include_docs_urls(title='Movr API Documentation', public=True)),
     # path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     # path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),

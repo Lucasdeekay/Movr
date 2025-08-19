@@ -2,14 +2,13 @@ from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day, Wallet, Transaction, Transfer, WithdrawalRequest, Badge, UserBadge, ReferralToken, \
-    Referral, PaystackAccount, PaystackTransaction
-from .serializers import CustomUserSerializer, KYCSerializer, VehicleSerializer, PaymentMethodSerializer, \
+from rest_framework.filters import SearchFilter, OrderingFilter
+
+from .models import CustomUser, KYC, Notification, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
+    Route, ScheduledRoute, Day, Badge, UserBadge, ReferralToken, Referral
+from .serializers import CustomUserSerializer, KYCSerializer, NotificationSerializer, VehicleSerializer, \
     SubscriptionPlanSerializer, SubscriptionSerializer, OTPSerializer, SocialMediaLinkSerializer, RouteSerializer, \
-    ScheduledRouteSerializer, DaySerializer, WalletSerializer, TransactionSerializer, TransferSerializer, \
-    WithdrawalRequestSerializer, BadgeSerializer, UserBadgeSerializer, ReferralTokenSerializer, ReferralSerializer, \
-    PaystackAccountSerializer, PaystackTransactionSerializer
+    ScheduledRouteSerializer, DaySerializer, BadgeSerializer, UserBadgeSerializer, ReferralTokenSerializer, ReferralSerializer
 
 
 class CustomUserViewSet(viewsets.ModelViewSet):
@@ -27,39 +26,6 @@ class SocialMediaLinkViewSet(viewsets.ModelViewSet):
 class VehicleViewSet(viewsets.ModelViewSet):
     queryset = Vehicle.objects.all()
     serializer_class = VehicleSerializer
-
-class PaymentMethodViewSet(viewsets.ModelViewSet):
-    queryset = PaymentMethod.objects.all()
-    serializer_class = PaymentMethodSerializer
-
-# Paystack Viewsets
-class PaystackAccountViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet to manage Paystack accounts.
-    """
-    serializer_class = PaystackAccountSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return PaystackAccount.objects.filter(user=self.request.user)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-
-class PaystackTransactionViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet to manage Paystack transactions.
-    """
-    serializer_class = PaystackTransactionSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return PaystackTransaction.objects.filter(user=self.request.user).order_by('-created_at')
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
 
 class SubscriptionPlanViewSet(viewsets.ModelViewSet):
     queryset = SubscriptionPlan.objects.all()
@@ -97,42 +63,6 @@ class DayViewSet(viewsets.ModelViewSet):
     serializer_class = DaySerializer
     queryset = Day.objects.all()
     permission_classes = [IsAuthenticated]
-
-
-class WalletViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet to manage Wallet operations.
-    """
-    serializer_class = WalletSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return Wallet.objects.filter(user=self.request.user)
-
-
-class TransactionViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet to manage user transactions.
-    """
-    serializer_class = TransactionSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return Transaction.objects.filter(user=self.request.user).order_by("-timestamp")
-
-class TransferViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet to manage transfers between users.
-    """
-    serializer_class = TransferSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return Transfer.objects.filter(sender=self.request.user) | Transfer.objects.filter(recipient=self.request.user)
-
-class WithdrawalRequestViewSet(viewsets.ModelViewSet):
-    queryset = WithdrawalRequest.objects.all()
-    serializer_class = WithdrawalRequestSerializer
 
 class BadgeViewSet(viewsets.ModelViewSet):
     """
@@ -175,3 +105,33 @@ class ReferralViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Referral.objects.filter(referred_by=self.request.user)
 
+class NotificationViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Notification model.
+    
+    Provides CRUD operations for notifications with user-specific filtering.
+    """
+    serializer_class = NotificationSerializer
+    filter_backends = (SearchFilter, OrderingFilter)
+    filterset_fields = ['is_read', 'created_at']
+    search_fields = ['title', 'message']
+    ordering_fields = ['created_at', 'is_read']
+    ordering = ['-created_at']
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Return notifications for the authenticated user only."""
+        return Notification.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        """Log notification creation."""
+        notification = serializer.save()
+
+    def perform_update(self, serializer):
+        """Log notification updates."""
+        notification = serializer.save()
+
+    def perform_destroy(self, instance):
+        """Log notification deletion."""
+        user_email = instance.user.email
+        instance.delete()

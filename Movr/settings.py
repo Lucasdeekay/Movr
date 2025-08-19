@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     # 'drf_yasg',  # drf_yasg fro Swagger documentation
     'channels',
     'Api',
+    'wallet',
 ]
 
 MIDDLEWARE = [

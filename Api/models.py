@@ -96,96 +96,6 @@ class Vehicle(models.Model):
         return f"Vehicle Details for {self.user.username}"
 
 
-# Payment Models
-class PaymentMethod(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='payment_methods')
-    method_name = models.CharField(max_length=50)
-    account_details = models.CharField(max_length=100)
-
-    def __str__(self):
-        return f"{self.method_name} - {self.user.username}"
-
-
-# Paystack DVA Models
-class PaystackAccount(models.Model):
-    """
-    Model to store Paystack DVA (Direct Virtual Account) information
-    """
-    ACCOUNT_TYPE_CHOICES = [
-        ('dva', 'Direct Virtual Account'),
-        ('standard', 'Standard Account'),
-    ]
-    
-    STATUS_CHOICES = [
-        ('active', 'Active'),
-        ('inactive', 'Inactive'),
-        ('pending', 'Pending'),
-        ('suspended', 'Suspended'),
-    ]
-    
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='paystack_account')
-    account_type = models.CharField(max_length=20, choices=ACCOUNT_TYPE_CHOICES, default='dva')
-    account_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
-    bank_name = models.CharField(max_length=100, null=True, blank=True)
-    bank_code = models.CharField(max_length=10, null=True, blank=True)
-    paystack_customer_code = models.CharField(max_length=100, null=True, blank=True)
-    paystack_account_id = models.CharField(max_length=100, null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    is_active = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"Paystack Account for {self.user.email} - {self.account_number}"
-    
-    class Meta:
-        verbose_name = "Paystack Account"
-        verbose_name_plural = "Paystack Accounts"
-
-
-class PaystackTransaction(models.Model):
-    """
-    Model to track Paystack transactions
-    """
-    TRANSACTION_TYPE_CHOICES = [
-        ('deposit', 'Deposit'),
-        ('withdrawal', 'Withdrawal'),
-        ('transfer', 'Transfer'),
-    ]
-    
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('success', 'Success'),
-        ('failed', 'Failed'),
-        ('abandoned', 'Abandoned'),
-        ('reversed', 'Reversed'),
-    ]
-    
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='paystack_transactions')
-    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES)
-    paystack_reference = models.CharField(max_length=100, unique=True)
-    paystack_transaction_id = models.CharField(max_length=100, null=True, blank=True)
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
-    currency = models.CharField(max_length=3, default='NGN')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    gateway_response = models.TextField(null=True, blank=True)
-    channel = models.CharField(max_length=50, null=True, blank=True)
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
-    narration = models.CharField(max_length=255, null=True, blank=True)
-    fees = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    paid_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"{self.user.email} - {self.transaction_type} - {self.amount} ({self.status})"
-    
-    class Meta:
-        verbose_name = "Paystack Transaction"
-        verbose_name_plural = "Paystack Transactions"
-        ordering = ['-created_at']
-
-
 class SubscriptionPlan(models.Model):
     NAME_CHOICES = (
         ('free', 'FREE'),
@@ -394,24 +304,6 @@ class PackageOffer(models.Model):
         return f"Package Offer for {self.package_bid.package.location} to {self.package_bid.package.destination}"
 
 
-class Wallet(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="wallet")
-    balance = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
-
-    def deposit(self, amount):
-        self.balance += Decimal(amount)
-        self.save()
-
-    def withdraw(self, amount):
-        if amount > self.balance:
-            raise ValueError("Insufficient funds")
-        self.balance -= Decimal(amount)
-        self.save()
-
-    def __str__(self):
-        return f"{self.user.email} - Balance: {self.balance}"
-
-
 class Transaction(models.Model):
     TRANSACTION_TYPE_CHOICES = [
         ("deposit", "Deposit"),
@@ -427,70 +319,6 @@ class Transaction(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.transaction_type.capitalize()} - {self.amount}"
-
-
-class Transfer(models.Model):
-    sender = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transfers_sent")
-    recipient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transfers_received")
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
-    timestamp = models.DateTimeField(default=timezone.now)
-    message = models.TextField(null=True, blank=True)
-
-    def __str__(self):
-        return f"{self.sender.email} -> {self.recipient.email}: {self.amount}"
-
-
-class WithdrawalRequest(models.Model):
-    """
-    Model to handle withdrawal requests.
-    """
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('approved', 'Approved'),
-        ('rejected', 'Rejected'),
-    ]
-
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="withdrawal_requests",
-        verbose_name=_("User")
-    )
-    amount = models.DecimalField(
-        max_digits=10, decimal_places=2,
-        verbose_name=_("Amount")
-    )
-    bank_name = models.CharField(
-        max_length=100,
-        verbose_name=_("Bank Name")
-    )
-    account_number = models.CharField(
-        max_length=20,
-        verbose_name=_("Account Number")
-    )
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default='pending',
-        verbose_name=_("Status")
-    )
-    reason = models.TextField(
-        null=True,
-        blank=True,
-        verbose_name=_("Reason for Rejection")
-    )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name=_("Created At")
-    )
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        verbose_name=_("Updated At")
-    )
-
-    def __str__(self):
-        return f"Withdrawal Request {self.id} - {self.user.email} - {self.amount} ({self.status})"
-
 
 class Badge(models.Model):
     name = models.CharField(max_length=100)
@@ -564,4 +392,91 @@ class Referral(models.Model):
             token_used=token
         )
 
+class Notification(models.Model):
+    """
+    Model representing a notification sent to a user.
+    
+    Manages user notifications including titles, messages, read status,
+    and creation timestamps for tracking user engagement.
+    """
+    user = models.ForeignKey(
+        CustomUser, 
+        on_delete=models.CASCADE, 
+        related_name="notifications",
+        help_text="User who receives the notification"
+    )
+    title = models.CharField(
+        max_length=200, 
+        null=True, 
+        blank=True,
+        help_text="Title of the notification"
+    )
+    message = models.TextField(
+        help_text="Content/message of the notification"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="When the notification was created"
+    )
+    is_read = models.BooleanField(
+        default=False, 
+        help_text="Whether the notification has been read"
+    )
 
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Notification"
+        verbose_name_plural = "Notifications"
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['is_read', '-created_at']),
+        ]
+
+    def __str__(self) -> str:
+        """String representation of the Notification."""
+        title = self.title or "No Title"
+        return f"Notification for {self.user.email} - {title}"
+
+    def mark_as_read(self):
+        """
+        Mark the notification as read.
+        
+        Updates the is_read field to True.
+        """
+        self.is_read = True
+        self.save(update_fields=['is_read'])
+
+    def mark_as_unread(self):
+        """
+        Mark the notification as unread.
+        
+        Updates the is_read field to False.
+        """
+        self.is_read = False
+        self.save(update_fields=['is_read'])
+
+    @classmethod
+    def get_unread_count(cls, user):
+        """
+        Get count of unread notifications for a user.
+        
+        Args:
+            user: User instance
+            
+        Returns:
+            int: Count of unread notifications
+        """
+        return cls.objects.filter(user=user, is_read=False).count()
+
+    @classmethod
+    def mark_all_as_read(cls, user):
+        """
+        Mark all notifications as read for a user.
+        
+        Args:
+            user: User instance
+            
+        Returns:
+            int: Number of notifications marked as read
+        """
+        return cls.objects.filter(user=user, is_read=False).update(is_read=True)

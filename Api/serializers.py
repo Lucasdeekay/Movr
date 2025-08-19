@@ -2,10 +2,16 @@ from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 from decimal import Decimal
 
-from .models import CustomUser, KYC, Vehicle, PaymentMethod, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, Wallet, Transaction, Transfer, WithdrawalRequest, \
-    Badge, UserBadge, ReferralToken, Referral, PaystackAccount, PaystackTransaction
+from Api.utils import upload_to_cloudinary
+from wallet.services import update_bvn_on_reserved_account
 
+from .models import CustomUser, KYC, Notification, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
+    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, \
+    Badge, UserBadge, ReferralToken, Referral
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 class TokenSerializer(serializers.ModelSerializer):
     class Meta:
@@ -18,11 +24,149 @@ class CustomUserSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class KYCSerializer(serializers.ModelSerializer):
-    user = CustomUserSerializer(read_only=True)
-
+    """
+    Serializer for KYC model.
+    
+    Handles KYC document uploads and validation including
+    national ID, driver license, and proof of address.
+    """
+    national_id = serializers.SerializerMethodField()
+    driver_license = serializers.SerializerMethodField()
     class Meta:
         model = KYC
-        fields = '__all__'
+        fields = (
+            'user', 'national_id', 'bvn', 'driver_license', 'proof_of_address',
+            'status', 'updated_at', 'verified_at'
+        )
+        read_only_fields = ('updated_at', 'verified_at')
+
+    def validate_bvn(self, value):
+        """
+        Validate BVN format.
+        
+        Ensures BVN is exactly 11 digits.
+        """
+        if value and len(str(value)) != 11:
+            raise serializers.ValidationError("BVN must be exactly 11 digits.")
+        return value
+
+    def create(self, validated_data):
+        """
+        Create a new KYC instance.
+        
+        Handles document uploads to Cloudinary.
+        """
+        try:
+            request = self.context.get('request')
+
+            # Handle national_id upload
+            national_id_file = None
+            if request and request.FILES:
+                national_id_file = request.FILES.get('national_id')
+            if national_id_file:
+                national_id_url = upload_to_cloudinary(national_id_file)
+                validated_data['national_id'] = national_id_url
+            else:
+                validated_data.pop('national_id', None)
+
+            # Handle driver_license upload
+            driver_license_file = None
+            if request and request.FILES:
+                driver_license_file = request.FILES.get('driver_license')
+            if driver_license_file:
+                driver_license_url = upload_to_cloudinary(driver_license_file)
+                validated_data['driver_license'] = driver_license_url
+            else:
+                validated_data.pop('driver_license', None)
+
+            kyc = super().create(validated_data)
+            bvn = validated_data.get("bvn")
+
+            if bvn:
+                try:
+                    update_bvn_on_reserved_account(kyc.user, bvn)
+                except ValueError as e:
+                    # surface the error but do NOT roll back KYC
+                    raise serializers.ValidationError({"bvn": str(e)})
+            logger.info(f"KYC created successfully for user: {kyc.user.email}")
+            return kyc
+            
+        except Exception as e:
+            logger.error(f"Error creating KYC: {str(e)}")
+            raise serializers.ValidationError(f"Error creating KYC: {str(e)}")
+
+    def update(self, instance, validated_data):
+        """
+        Update an existing KYC instance.
+        
+        Handles document uploads to Cloudinary.
+        """
+        try:
+            request = self.context.get('request')
+
+            # Handle national_id upload
+            national_id_file = None
+            if request and request.FILES:
+                national_id_file = request.FILES.get('national_id')
+            if national_id_file:
+                national_id_url = upload_to_cloudinary(national_id_file)
+                validated_data['national_id'] = national_id_url
+            elif 'national_id' in validated_data and validated_data['national_id'] is None:
+                pass
+            else:
+                validated_data.pop('national_id', None)
+
+            # Handle driver_license upload
+            driver_license_file = None
+            if request and request.FILES:
+                driver_license_file = request.FILES.get('driver_license')
+            if driver_license_file:
+                driver_license_url = upload_to_cloudinary(driver_license_file)
+                validated_data['driver_license'] = driver_license_url
+            elif 'driver_license' in validated_data and validated_data['driver_license'] is None:
+                pass
+            else:
+                validated_data.pop('driver_license', None)
+
+            kyc = super().update(instance, validated_data)
+            old_bvn = instance.bvn
+            instance = super().update(instance, validated_data)
+            new_bvn = instance.bvn
+
+            if new_bvn and new_bvn != old_bvn:
+                try:
+                    update_bvn_on_reserved_account(instance.user, new_bvn)
+                except ValueError as e:
+                    raise serializers.ValidationError({"bvn": str(e)})
+            logger.info(f"KYC updated successfully for user: {kyc.user.email}")
+            
+        except Exception as e:
+            logger.error(f"Error updating KYC: {str(e)}")
+            raise serializers.ValidationError(f"Error updating KYC: {str(e)}")
+
+    def get_national_id(self, obj):
+        """
+        Get national ID URL.
+        
+        Returns the national ID URL if it exists, otherwise None.
+        """
+        return obj.national_id if obj.national_id else None
+
+    def get_driver_license(self, obj):
+        """
+        Get driver license URL.
+        
+        Returns the driver license URL if it exists, otherwise None.
+        """
+        return obj.driver_license if obj.driver_license else None
+
+    def get_proof_of_address(self, obj):
+        """
+        Get proof of address URL.
+        
+        Returns the proof of address URL if it exists, otherwise None.
+        """
+        return obj.proof_of_address if obj.proof_of_address else None
 
 class SocialMediaLinkSerializer(serializers.ModelSerializer):
     class Meta:
@@ -35,97 +179,6 @@ class VehicleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vehicle
         fields = '__all__'
-
-class PaymentMethodSerializer(serializers.ModelSerializer):
-    user = CustomUserSerializer(read_only=True)
-
-    class Meta:
-        model = PaymentMethod
-        fields = '__all__'
-
-# Paystack Serializers
-class PaystackAccountSerializer(serializers.ModelSerializer):
-    user = CustomUserSerializer(read_only=True)
-    
-    class Meta:
-        model = PaystackAccount
-        fields = [
-            'id', 'user', 'account_type', 'account_number', 'bank_name', 
-            'bank_code', 'status', 'is_active', 'created_at', 'updated_at'
-        ]
-        read_only_fields = [
-            'id', 'user', 'account_number', 'bank_name', 'bank_code', 
-            'paystack_customer_code', 'paystack_account_id', 'status', 
-            'is_active', 'created_at', 'updated_at'
-        ]
-
-
-class PaystackTransactionSerializer(serializers.ModelSerializer):
-    user = CustomUserSerializer(read_only=True)
-    
-    class Meta:
-        model = PaystackTransaction
-        fields = [
-            'id', 'user', 'transaction_type', 'paystack_reference', 
-            'paystack_transaction_id', 'amount', 'currency', 'status',
-            'gateway_response', 'channel', 'ip_address', 'narration',
-            'fees', 'paid_at', 'created_at', 'updated_at'
-        ]
-        read_only_fields = [
-            'id', 'user', 'paystack_reference', 'paystack_transaction_id',
-            'gateway_response', 'channel', 'ip_address', 'fees', 
-            'paid_at', 'created_at', 'updated_at'
-        ]
-
-
-class CreatePaystackAccountSerializer(serializers.Serializer):
-    """
-    Serializer for creating Paystack DVA account
-    """
-    preferred_bank = serializers.CharField(required=False, allow_blank=True)
-
-
-class PaystackDepositSerializer(serializers.Serializer):
-    """
-    Serializer for Paystack deposit
-    """
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('100.00'))
-    email = serializers.EmailField()
-    reference = serializers.CharField(required=False, allow_blank=True)
-    callback_url = serializers.URLField(required=False, allow_blank=True)
-
-
-class PaystackWithdrawalSerializer(serializers.Serializer):
-    """
-    Serializer for Paystack withdrawal
-    """
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('100.00'))
-    bank_code = serializers.CharField(max_length=10)
-    account_number = serializers.CharField(max_length=20)
-    account_name = serializers.CharField(max_length=100)
-    narration = serializers.CharField(required=False, allow_blank=True)
-
-
-class BankSerializer(serializers.Serializer):
-    """
-    Serializer for bank information
-    """
-    id = serializers.IntegerField()
-    name = serializers.CharField()
-    code = serializers.CharField()
-    active = serializers.BooleanField()
-    country = serializers.CharField()
-    currency = serializers.CharField()
-    type = serializers.CharField()
-
-
-class ResolveAccountSerializer(serializers.Serializer):
-    """
-    Serializer for resolving account number
-    """
-    account_number = serializers.CharField(max_length=20)
-    bank_code = serializers.CharField(max_length=10)
-
 
 class SubscriptionPlanSerializer(serializers.ModelSerializer):
     class Meta:
@@ -224,48 +277,6 @@ class PackageOfferSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class WalletSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Wallet
-        fields = ["id", "user", "balance"]
-        read_only_fields = ["id", "user", "balance"]
-
-class TransactionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Transaction
-        fields = ["id", "user", "transaction_type", "amount", "timestamp", "description"]
-        read_only_fields = ["id", "user", "timestamp"]
-
-class TransferSerializer(serializers.ModelSerializer):
-    sender = serializers.StringRelatedField(read_only=True)
-    recipient = serializers.StringRelatedField()
-
-    class Meta:
-        model = Transfer
-        fields = ["id", "sender", "recipient", "amount", "timestamp", "message"]
-        read_only_fields = ["id", "sender", "timestamp"]
-
-
-class WithdrawalRequestSerializer(serializers.ModelSerializer):
-    """
-    Serializer for the WithdrawalRequest model.
-    """
-    class Meta:
-        model = WithdrawalRequest
-        fields = [
-            'id',
-            'user',
-            'amount',
-            'bank_name',
-            'account_number',
-            'status',
-            'reason',
-            'created_at',
-            'updated_at'
-        ]
-        read_only_fields = ['id', 'user', 'status', 'reason', 'created_at', 'updated_at']
-
-
 class BadgeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Badge
@@ -310,3 +321,117 @@ class ReferralSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at']
 
+class NotificationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Notification model.
+    
+    Handles notification data serialization and deserialization including
+    message content, read status, and user association.
+    """
+    
+    class Meta:
+        model = Notification
+        fields = ('id', 'user', 'title', 'message', 'created_at', 'is_read')
+        read_only_fields = ('id', 'created_at')
+        extra_kwargs = {
+            'user': {'required': True},
+            'message': {'required': True},
+            'title': {'required': False}
+        }
+
+    def validate_message(self, value):
+        """
+        Validate message content.
+        
+        Ensures message is not empty and has reasonable length.
+        """
+        if not value or not value.strip():
+            raise serializers.ValidationError("Message cannot be empty.")
+        
+        if len(value) > 1000:
+            raise serializers.ValidationError("Message is too long. Maximum 1000 characters.")
+        
+        return value.strip()
+
+    def validate_title(self, value):
+        """
+        Validate title content.
+        
+        Ensures title has reasonable length if provided.
+        """
+        if value and len(value) > 200:
+            raise serializers.ValidationError("Title is too long. Maximum 200 characters.")
+        
+        return value.strip() if value else value
+
+    def create(self, validated_data):
+        """
+        Create a new notification instance.
+        
+        Handles notification creation with proper validation.
+        """
+        try:
+            notification = super().create(validated_data)
+            logger.info(f"Notification created for user: {notification.user.email}")
+            return notification
+            
+        except Exception as e:
+            logger.error(f"Error creating notification: {str(e)}")
+            raise serializers.ValidationError(f"Error creating notification: {str(e)}")
+
+    def update(self, instance, validated_data):
+        """
+        Update an existing notification instance.
+        
+        Handles notification updates with proper validation.
+        """
+        try:
+            notification = super().update(instance, validated_data)
+            logger.info(f"Notification updated for user: {notification.user.email}")
+            return notification
+            
+        except Exception as e:
+            logger.error(f"Error updating notification: {str(e)}")
+            raise serializers.ValidationError(f"Error updating notification: {str(e)}")
+
+
+class NotificationListSerializer(serializers.ModelSerializer):
+    """
+    Serializer for listing notifications.
+    
+    Provides a simplified view of notifications for list endpoints
+    with optimized field selection.
+    """
+    
+    class Meta:
+        model = Notification
+        fields = ('id', 'title', 'message', 'created_at', 'is_read')
+        read_only_fields = ('id', 'created_at')
+
+
+class NotificationDetailSerializer(serializers.ModelSerializer):
+    """
+    Serializer for detailed notification view.
+    
+    Provides comprehensive notification information including
+    user details and full message content.
+    """
+    
+    user_email = serializers.ReadOnlyField(source='user.email')
+    user_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Notification
+        fields = (
+            'id', 'user', 'user_email', 'user_name', 'title', 'message', 
+            'created_at', 'is_read'
+        )
+        read_only_fields = ('id', 'created_at', 'user_email', 'user_name')
+
+    def get_user_name(self, obj):
+        """
+        Get user's full name.
+        
+        Returns the user's full name or email if name is not available.
+        """
+        return obj.user.get_full_name() if obj.user else None

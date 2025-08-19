@@ -1,11 +1,9 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .viewsets import (
-    CustomUserViewSet, KYCViewSet, VehicleViewSet,
-    PaymentMethodViewSet, SubscriptionPlanViewSet,
+    CustomUserViewSet, KYCViewSet, VehicleViewSet, SubscriptionPlanViewSet,
     SubscriptionViewSet, OTPViewSet, SocialMediaLinkViewSet, RouteViewSet, ScheduledRouteViewSet, DayViewSet,
-    WalletViewSet, TransactionViewSet, TransferViewSet, WithdrawalRequestViewSet, BadgeViewSet, UserBadgeViewSet,
-    ReferralTokenViewSet, ReferralViewSet, PaystackAccountViewSet, PaystackTransactionViewSet
+    BadgeViewSet, UserBadgeViewSet, ReferralTokenViewSet, ReferralViewSet
 )
 from .views import (
     RegisterView,
@@ -16,10 +14,9 @@ from .views import (
     ResetPasswordView, UpdateKYCView, UpdateVehicleInfoView, UpdatePersonalInfoView, UpdateSubscriptionPlanView,
     CreateRouteView, CreateScheduledRouteView, UserRoutesView, ToggleIsLiveRouteView, PackageSubmissionView,
     PlaceBidView, PickupConfirmationView, DeliveryConfirmationView, SelectMoverView, GetAllBidsView, GetBidDetailView,
-    GetPackageOfferDetailView, ResendOTPView, DepositView, WithdrawView, WalletDetailsView, PickedUpPackageOffersView,
-    ScheduledPackageOffersView, CancelPackageOfferView, PaystackAccountView, PaystackDepositView, PaystackWithdrawalView,
-    PaystackWebhookView, PaystackBanksView, PaystackResolveAccountView, PaystackTransactionsView
-)
+    GetPackageOfferDetailView, ResendOTPView, PickedUpPackageOffersView,
+    ScheduledPackageOffersView, CancelPackageOfferView,
+    )
 
 # Initialize the router
 router = DefaultRouter()
@@ -29,23 +26,16 @@ router.register(r'users', CustomUserViewSet, basename='user')
 router.register(r'kyc', KYCViewSet, basename='kyc')
 router.register(r'social-media-links', SocialMediaLinkViewSet, basename='social-media-link')
 router.register(r'vehicles', VehicleViewSet, basename='vehicle')
-router.register(r'payment-methods', PaymentMethodViewSet, basename='payment-method')
 router.register(r'subscription-plans', SubscriptionPlanViewSet, basename='subscription-plan')
 router.register(r'subscriptions', SubscriptionViewSet, basename='subscription')
 router.register(r'otps', OTPViewSet, basename='otp')
 router.register(r'routes', RouteViewSet, basename='route')
 router.register(r'scheduled-routes', ScheduledRouteViewSet, basename='scheduled-route')
 router.register(r'days', DayViewSet, basename='day')
-router.register(r'wallets', WalletViewSet, basename='wallet')
-router.register(r'transactions', TransactionViewSet, basename='transaction')
-router.register(r'transfer', TransferViewSet, basename='transfer')
-router.register(r'withdrawal-requests', WithdrawalRequestViewSet, basename='withdrawal-requests')
 router.register(r'badges', BadgeViewSet, basename='badge')
 router.register(r'user-badges', UserBadgeViewSet, basename='userbadge')
 router.register(r'referral-tokens', ReferralTokenViewSet, basename='referral-token')
 router.register(r'referrals', ReferralViewSet, basename='referral')
-router.register(r'paystack-accounts', PaystackAccountViewSet, basename='paystack-account')
-router.register(r'paystack-transactions', PaystackTransactionViewSet, basename='paystack-transaction')
 
 # Include the router in your URL patterns
 urlpatterns = [
@@ -72,21 +62,10 @@ urlpatterns = [
     path('package-offer/<int:package_offer_id>/', GetPackageOfferDetailView.as_view(), name='get-package-offer-detail'),
     path('confirm-pickup/<int:package_offer_id>/', PickupConfirmationView.as_view(), name='confirm-pickup'),
     path('confirm-delivery/<int:package_offer_id>/', DeliveryConfirmationView.as_view(), name='confirm-delivery'),
-    path('wallet/', WalletDetailsView.as_view(), name='wallet-details'),
-    path("wallet/deposit/", DepositView.as_view(), name="wallet-deposit"),
-    path("wallet/withdraw/", WithdrawView.as_view(), name="wallet-withdraw"),
     path('offers/picked-up/', PickedUpPackageOffersView.as_view(), name='picked-up-package-offers'),
     path('offers/scheduled/', ScheduledPackageOffersView.as_view(), name='scheduled-package-offers'),
     path('offers/<int:pk>/cancel/', CancelPackageOfferView.as_view(), name='cancel-package-offer'),
     
-    # Paystack URLs
-    path('paystack/account/', PaystackAccountView.as_view(), name='paystack-account'),
-    path('paystack/deposit/', PaystackDepositView.as_view(), name='paystack-deposit'),
-    path('paystack/withdraw/', PaystackWithdrawalView.as_view(), name='paystack-withdraw'),
-    path('paystack/webhook/', PaystackWebhookView.as_view(), name='paystack-webhook'),
-    path('paystack/banks/', PaystackBanksView.as_view(), name='paystack-banks'),
-    path('paystack/resolve-account/', PaystackResolveAccountView.as_view(), name='paystack-resolve-account'),
-    path('paystack/transactions/', PaystackTransactionsView.as_view(), name='paystack-transactions'),
     
     path('api/', include(router.urls)),
 ]
