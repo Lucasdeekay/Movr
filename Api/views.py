@@ -22,6 +22,8 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import TokenAuthentication
+
+from wallet.models import Transaction, Wallet
 from .models import Route, ScheduledRoute, Day, Package, Bid, PackageOffer, QRCode
 from .models import CustomUser, KYC, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink
 from .serializers import CustomUserSerializer, OTPVerificationSerializer, TokenSerializer, VehicleSerializer, \
@@ -178,9 +180,6 @@ class VerifyOTPView(APIView):
         if otp.is_used:
             return Response({'error': 'OTP has already been used'}, status=status.HTTP_400_BAD_REQUEST)
 
-        print(otp.created_at)
-        print(otp.expires_at)
-        print(otp.is_expired())
         # Check if the OTP has expired
         if otp.is_expired():
             return Response({'error': 'OTP has expired'}, status=status.HTTP_400_BAD_REQUEST)
@@ -578,24 +577,25 @@ class UpdateVehicleInfoView(APIView):
                 image_file = data[field]
 
                 # Check if the uploaded file is a valid image
-                if isinstance(image_file, InMemoryUploadedFile):
-                    if not image_file.content_type.startswith('image'):
-                        return Response(
-                            {'error': f'{field} must be an image file.'},
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
+                if image_file:
+                    if isinstance(image_file, InMemoryUploadedFile):
+                        if not image_file.content_type.startswith('image'):
+                            return Response(
+                                {'error': f'{field} must be an image file.'},
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
 
-                    # Limit file size to 5MB
-                    if image_file.size > 5 * 1024 * 1024:
+                        # Limit file size to 5MB
+                        if image_file.size > 5 * 1024 * 1024:
+                            return Response(
+                                {'error': f'{field} image size must be under 5MB.'},
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
+                    else:
                         return Response(
-                            {'error': f'{field} image size must be under 5MB.'},
+                            {'error': f'{field} is required to be a valid image file.'},
                             status=status.HTTP_400_BAD_REQUEST
                         )
-                else:
-                    return Response(
-                        {'error': f'{field} is required to be a valid image file.'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
 
         # Initialize the serializer with the existing vehicle data and the new data
         serializer = VehicleSerializer(vehicle, data=data, partial=True)
@@ -1186,6 +1186,24 @@ class SelectMoverView(APIView):
 
         except Bid.DoesNotExist:
             return Response({"error": "Bid not found."}, status=status.HTTP_404_NOT_FOUND)
+
+
+class GetAllPackageOffersView(APIView):
+    authentication_classes = [TokenAuthentication]
+#     permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = get_user_from_token(request)
+            # Retrieve all package offers for the authenticated user
+            package_offers = PackageOffer.objects.filter(package_bid__package__user=user)
+
+            # Serialize the package offer data
+            serializer = PackageOfferSerializer(package_offers, many=True)
+            return Response(serializer.data, status=200)
+
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=500)
 
 
 class GetPackageOfferDetailView(APIView):

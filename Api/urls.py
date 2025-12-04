@@ -14,7 +14,7 @@ from .views import (
     ResetPasswordView, UpdateKYCView, UpdateVehicleInfoView, UpdatePersonalInfoView, UpdateSubscriptionPlanView,
     CreateRouteView, CreateScheduledRouteView, UserRoutesView, ToggleIsLiveRouteView, PackageSubmissionView,
     PlaceBidView, PickupConfirmationView, DeliveryConfirmationView, SelectMoverView, GetAllBidsView, GetBidDetailView,
-    GetPackageOfferDetailView, ResendOTPView, PickedUpPackageOffersView,
+    GetPackageOfferDetailView, ResendOTPView, PickedUpPackageOffersView, GetAllPackageOffersView,
     ScheduledPackageOffersView, CancelPackageOfferView,
     )
 
@@ -53,19 +53,18 @@ urlpatterns = [
     path('create-route/', CreateRouteView.as_view(), name='create-route'),
     path('create-scheduled-route/', CreateScheduledRouteView.as_view(), name='create-scheduled-route'),
     path('user-routes/', UserRoutesView.as_view(), name='user-routes'),
-    path('toggle-is-live/<int:route_id>/', ToggleIsLiveRouteView.as_view(), name='toggle-is-live'),
+    path('toggle-is-live/<uuid:route_id>/', ToggleIsLiveRouteView.as_view(), name='toggle-is-live'),
     path('submit-package/', PackageSubmissionView.as_view(), name='submit-package'),
-    path('place-bid/<int:package_id>/', PlaceBidView.as_view(), name='place-bid'),
-    path('package/<int:package_id>/bids/', GetAllBidsView.as_view(), name='get-all-bids'),
-    path('bid/<int:bid_id>/', GetBidDetailView.as_view(), name='get-bid-detail'),
-    path('select-mover/<int:bid_id>/', SelectMoverView.as_view(), name='select-mover'),
-    path('package-offer/<int:package_offer_id>/', GetPackageOfferDetailView.as_view(), name='get-package-offer-detail'),
-    path('confirm-pickup/<int:package_offer_id>/', PickupConfirmationView.as_view(), name='confirm-pickup'),
-    path('confirm-delivery/<int:package_offer_id>/', DeliveryConfirmationView.as_view(), name='confirm-delivery'),
+    path('place-bid/<uuid:package_id>/', PlaceBidView.as_view(), name='place-bid'),
+    path('package/<uuid:package_id>/bids/', GetAllBidsView.as_view(), name='get-all-bids'),
+    path('bid/<uuid:bid_id>/', GetBidDetailView.as_view(), name='get-bid-detail'),
+    path('select-mover/<uuid:bid_id>/', SelectMoverView.as_view(), name='select-mover'),
+    path('package-offers/', GetAllPackageOffersView.as_view(), name='get-all-package-offers'),
+    path('package-offer/<uuid:package_offer_id>/', GetPackageOfferDetailView.as_view(), name='get-package-offer-detail'),
+    path('confirm-pickup/<uuid:package_offer_id>/', PickupConfirmationView.as_view(), name='confirm-pickup'),
+    path('confirm-delivery/<uuid:package_offer_id>/', DeliveryConfirmationView.as_view(), name='confirm-delivery'),
     path('offers/picked-up/', PickedUpPackageOffersView.as_view(), name='picked-up-package-offers'),
     path('offers/scheduled/', ScheduledPackageOffersView.as_view(), name='scheduled-package-offers'),
-    path('offers/<int:pk>/cancel/', CancelPackageOfferView.as_view(), name='cancel-package-offer'),
-    
-    
+    path('offers/<uuid:pk>/cancel/', CancelPackageOfferView.as_view(), name='cancel-package-offer'),
     path('api/', include(router.urls)),
 ]

@@ -27,18 +27,15 @@ class KYCSerializer(serializers.ModelSerializer):
     """
     Serializer for KYC model.
     
-    Handles KYC document uploads and validation including
-    national ID, driver license, and proof of address.
+    Handles KYC document uploads and validation.
     """
-    national_id = serializers.SerializerMethodField()
     driver_license = serializers.SerializerMethodField()
     class Meta:
         model = KYC
         fields = (
-            'user', 'national_id', 'bvn', 'driver_license', 'proof_of_address',
-            'status', 'updated_at', 'verified_at'
+            'user', 'nin', 'bvn', 'driver_license',
+            'verified'
         )
-        read_only_fields = ('updated_at', 'verified_at')
 
     def validate_bvn(self, value):
         """
@@ -59,16 +56,6 @@ class KYCSerializer(serializers.ModelSerializer):
         try:
             request = self.context.get('request')
 
-            # Handle national_id upload
-            national_id_file = None
-            if request and request.FILES:
-                national_id_file = request.FILES.get('national_id')
-            if national_id_file:
-                national_id_url = upload_to_cloudinary(national_id_file)
-                validated_data['national_id'] = national_id_url
-            else:
-                validated_data.pop('national_id', None)
-
             # Handle driver_license upload
             driver_license_file = None
             if request and request.FILES:
@@ -81,6 +68,11 @@ class KYCSerializer(serializers.ModelSerializer):
 
             kyc = super().create(validated_data)
             bvn = validated_data.get("bvn")
+            nin = validated_data.get("nin")
+
+            if nin is not None:
+                kyc.nin = nin
+                kyc.save()
 
             if bvn:
                 try:
@@ -104,18 +96,6 @@ class KYCSerializer(serializers.ModelSerializer):
         try:
             request = self.context.get('request')
 
-            # Handle national_id upload
-            national_id_file = None
-            if request and request.FILES:
-                national_id_file = request.FILES.get('national_id')
-            if national_id_file:
-                national_id_url = upload_to_cloudinary(national_id_file)
-                validated_data['national_id'] = national_id_url
-            elif 'national_id' in validated_data and validated_data['national_id'] is None:
-                pass
-            else:
-                validated_data.pop('national_id', None)
-
             # Handle driver_license upload
             driver_license_file = None
             if request and request.FILES:
@@ -128,10 +108,17 @@ class KYCSerializer(serializers.ModelSerializer):
             else:
                 validated_data.pop('driver_license', None)
 
+
             kyc = super().update(instance, validated_data)
             old_bvn = instance.bvn
             instance = super().update(instance, validated_data)
             new_bvn = instance.bvn
+
+            nin = validated_data.get("nin")
+
+            if nin is not None:
+                kyc.nin = nin
+                kyc.save()
 
             if new_bvn and new_bvn != old_bvn:
                 try:
@@ -139,18 +126,13 @@ class KYCSerializer(serializers.ModelSerializer):
                 except ValueError as e:
                     raise serializers.ValidationError({"bvn": str(e)})
             logger.info(f"KYC updated successfully for user: {kyc.user.email}")
+
+            return kyc
             
         except Exception as e:
             logger.error(f"Error updating KYC: {str(e)}")
             raise serializers.ValidationError(f"Error updating KYC: {str(e)}")
 
-    def get_national_id(self, obj):
-        """
-        Get national ID URL.
-        
-        Returns the national ID URL if it exists, otherwise None.
-        """
-        return obj.national_id if obj.national_id else None
 
     def get_driver_license(self, obj):
         """
@@ -159,14 +141,6 @@ class KYCSerializer(serializers.ModelSerializer):
         Returns the driver license URL if it exists, otherwise None.
         """
         return obj.driver_license if obj.driver_license else None
-
-    def get_proof_of_address(self, obj):
-        """
-        Get proof of address URL.
-        
-        Returns the proof of address URL if it exists, otherwise None.
-        """
-        return obj.proof_of_address if obj.proof_of_address else None
 
 class SocialMediaLinkSerializer(serializers.ModelSerializer):
     class Meta:

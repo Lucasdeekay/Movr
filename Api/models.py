@@ -17,7 +17,32 @@ from django.core.files import File
 from django.utils.translation import gettext_lazy as _
 
 from Movr import settings
+import uuid
 
+class UUIDModel(models.Model):
+    """
+    An abstract base class that provides primary key field 'id' 
+    as a UUID instead of the default AutoField (integer).
+    """
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        # The db_column is optional, but sometimes useful for clarity
+        db_column='id' 
+    )
+    
+    # You might also want common audit fields here:
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+        # Setting ordering here is generally not recommended for UUIDs, 
+        # but you can order by creation time.
+        ordering = ('-created_at',)
+        verbose_name = 'UUID Model'
+        verbose_name_plural = 'UUID Models'
 
 # User Manager
 class UserManager(BaseUserManager):
@@ -38,7 +63,7 @@ class UserManager(BaseUserManager):
 
 
 # Custom User Model
-class CustomUser(AbstractBaseUser, PermissionsMixin):
+class CustomUser(AbstractBaseUser, PermissionsMixin, UUIDModel):
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=50, null=True, blank=True)
     last_name = models.CharField(max_length=50, null=True, blank=True)
@@ -54,34 +79,46 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = 'email'
 
     class Meta:
-        abstract = False
+        verbose_name = "User"
+        verbose_name_plural = "Users"
+        ordering = ("-date_joined",)
 
     def __str__(self):
         return f"{self.email}"
 
 
-class KYC(models.Model):
+class KYC(UUIDModel):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='kyc')
     bvn = models.CharField(max_length=11, unique=True, null=True, blank=True)
     nin = models.CharField(max_length=11, unique=True, null=True, blank=True)
     driver_license = models.ImageField(upload_to='driver_license/', null=True, blank=True)
     verified = models.BooleanField(default=False)
 
+    class Meta:
+        verbose_name = "KYC"
+        verbose_name_plural = "KYC Records"
+        ordering = ("-created_at",)
+
     def __str__(self):
         return f"KYC for {self.user.username}"
 
 
-class SocialMediaLink(models.Model):
+class SocialMediaLink(UUIDModel):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='social_media')
     facebook = models.URLField(unique=True, null=True, blank=True)
     instagram = models.URLField(unique=True, null=True, blank=True)
     linkedin = models.URLField(unique=True, null=True, blank=True)
 
+    class Meta:
+        verbose_name = "Social Media Link"
+        verbose_name_plural = "Social Media Links"
+        ordering = ("-created_at",)
+
     def __str__(self):
         return f"Social media link for {self.user.username}"
 
 
-class Vehicle(models.Model):
+class Vehicle(UUIDModel):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='vehicle')
     vehicle_plate_number = models.CharField(max_length=50, unique=True, null=True, blank=True)
     vehicle_type = models.CharField(max_length=50, null=True, blank=True)
@@ -92,11 +129,16 @@ class Vehicle(models.Model):
     vehicle_inspector_report = models.ImageField(upload_to='vehicle_inspector_report/', null=True, blank=True)
     vehicle_insurance = models.ImageField(upload_to='vehicle_insurance/', null=True, blank=True)
 
+    class Meta:
+        verbose_name = "Vehicle"
+        verbose_name_plural = "Vehicles"
+        ordering = ("-created_at",)
+
     def __str__(self):
         return f"Vehicle Details for {self.user.username}"
 
 
-class SubscriptionPlan(models.Model):
+class SubscriptionPlan(UUIDModel):
     NAME_CHOICES = (
         ('free', 'FREE'),
         ('basic', 'BASIC'),
@@ -115,26 +157,40 @@ class SubscriptionPlan(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal(0.00), choices=PRICE_CHOICES)
     duration = models.IntegerField(default=30, help_text="Duration in days")
 
+    class Meta:
+        verbose_name = "Subscription Plan"
+        verbose_name_plural = "Subscription Plans"
+        ordering = ("-created_at",)
+
     def __str__(self):
         return self.name
 
 
-class Subscription(models.Model):
+class Subscription(UUIDModel):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='subscriptions')
     plan = models.ForeignKey(SubscriptionPlan, on_delete=models.CASCADE)
     start_date = models.DateField(auto_now_add=True)
     end_date = models.DateField(blank=True, null=True)  # Allow end_date to be blank initially
 
+    class Meta:
+        verbose_name = "Subscription"
+        verbose_name_plural = "Subscriptions"
+        ordering = ("-created_at",)
+
     def __str__(self):
         return f"{self.user.email} - {self.plan.name}"
 
 
-class OTP(models.Model):
+class OTP(UUIDModel):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='otp')
     code = models.CharField(max_length=4, unique=True)
     is_used = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "OTP"
+        verbose_name_plural = "OTPs"
+        ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
         self.expires_at = timezone.now() + timezone.timedelta(hours=1)
@@ -159,7 +215,7 @@ class OTP(models.Model):
         )
 
 
-class Day(models.Model):
+class Day(UUIDModel):
     DAY_CHOICES = [
         ('monday', 'Monday'),
         ('tuesday', 'Tuesday'),
@@ -171,11 +227,16 @@ class Day(models.Model):
     ]
     name = models.CharField(max_length=10, choices=DAY_CHOICES, unique=True)
 
+    class Meta:
+        verbose_name = "Day"
+        verbose_name_plural = "Days"
+        ordering = ("name",)
+
     def __str__(self):
         return self.name
 
 
-class Route(models.Model):
+class Route(UUIDModel):
     TRANSPORTATION_MODE_CHOICES = [
         ('public', 'Public'),
         ('bike', 'Bike'),
@@ -208,22 +269,32 @@ class Route(models.Model):
     is_live = models.BooleanField(default=True)
     radius_range = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Radius in km")
 
+    class Meta:
+        verbose_name = "Route"
+        verbose_name_plural = "Routes"
+        ordering = ("-created_at",)
+    
     def __str__(self):
         return f"Route from {self.location} to {self.destination} by {self.user.email}"
 
 
-class ScheduledRoute(models.Model):
+class ScheduledRoute(UUIDModel):
     route = models.OneToOneField(Route, on_delete=models.CASCADE, related_name='scheduled_route')
     is_returning = models.BooleanField(default=False)
     returning_time = models.DateTimeField(null=True, blank=True)
     is_repeated = models.BooleanField(default=False)
     days_of_week = models.ManyToManyField('Day', blank=True)
 
+    class Meta:
+        verbose_name = "Scheduled Route"
+        verbose_name_plural = "Scheduled Routes"
+        ordering = ("-created_at",)
+    
     def __str__(self):
         return f"Scheduled Route for {self.route.user.email} from {self.route.location} to {self.route.destination}"
 
 
-class Package(models.Model):
+class Package(UUIDModel):
     WEIGHT_CHOICES = [
         ('light', 'Light'),
         ('medium', 'Medium'),
@@ -250,25 +321,39 @@ class Package(models.Model):
     receiver_phone_number = models.CharField(null=True, blank=True, max_length=15)
     range_radius = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Radius in km")
 
+    class Meta:
+        verbose_name = "Package"
+        verbose_name_plural = "Packages"
+        ordering = ("-created_at",)
+    
     def __str__(self):
         return f"Package from {self.location} to {self.destination} by {self.user.email}"
 
 
 # Bid Model
-class Bid(models.Model):
+class Bid(UUIDModel):
     package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name='bids')
     mover = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='bids')
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Bid"
+        verbose_name_plural = "Bids"
+        ordering = ("-created_at",)
 
     def __str__(self):
         return f"Bid by {self.mover.email} for {self.price}"
 
 
 # QR Code Model
-class QRCode(models.Model):
+class QRCode(UUIDModel):
     code = models.CharField(max_length=6, unique=True)
     qr_image = models.ImageField(upload_to='qr_codes/', null=True, blank=True)
+
+    class Meta:
+        verbose_name = "QR Code"
+        verbose_name_plural = "QR Codes"
+        ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
         if not self.code:
@@ -292,7 +377,7 @@ class QRCode(models.Model):
         super().save(*args, **kwargs)
 
 
-class PackageOffer(models.Model):
+class PackageOffer(UUIDModel):
     package_bid = models.ForeignKey(Bid, on_delete=models.CASCADE, related_name='package_offers')
     qr_code = models.ForeignKey(QRCode, on_delete=models.CASCADE, related_name='package_offers')
     is_picked_up = models.BooleanField(default=False)
@@ -300,11 +385,16 @@ class PackageOffer(models.Model):
     is_scheduled = models.BooleanField(default=False)  # New field to indicate scheduling
     is_cancelled = models.BooleanField(default=False)  # New field to track cancellations
 
+    class Meta:
+        verbose_name = "Package Offer"
+        verbose_name_plural = "Package Offers"
+        ordering = ("-created_at",)
+
     def __str__(self):
         return f"Package Offer for {self.package_bid.package.location} to {self.package_bid.package.destination}"
 
 
-class Transaction(models.Model):
+class Transaction(UUIDModel):
     TRANSACTION_TYPE_CHOICES = [
         ("deposit", "Deposit"),
         ("withdrawal", "Withdrawal"),
@@ -317,28 +407,43 @@ class Transaction(models.Model):
     timestamp = models.DateTimeField(default=timezone.now)
     description = models.TextField(null=True, blank=True)
 
+    class Meta:
+        verbose_name = "Transaction"
+        verbose_name_plural = "Transactions"
+        ordering = ("-timestamp",)
+
     def __str__(self):
         return f"{self.user.email} - {self.transaction_type.capitalize()} - {self.amount}"
 
-class Badge(models.Model):
+class Badge(UUIDModel):
     name = models.CharField(max_length=100)
     description = models.TextField()
     icon = models.ImageField(upload_to='badge_icons/', null=True, blank=True)
     criteria = models.CharField(max_length=255)
 
+    class Meta:
+        verbose_name = "Badge"
+        verbose_name_plural = "Badges"
+        ordering = ("name",)
+
     def __str__(self):
         return self.name
 
-class UserBadge(models.Model):
+class UserBadge(UUIDModel):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='badges')
     badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
     awarded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "User Badge"
+        verbose_name_plural = "User Badges"
+        ordering = ("-awarded_at",)
 
     def __str__(self):
         return f"{self.user.username} - {self.badge.name}"
 
 
-class ReferralToken(models.Model):
+class ReferralToken(UUIDModel):
     """
     Represents a unique referral token for a user.
     """
@@ -348,13 +453,17 @@ class ReferralToken(models.Model):
         related_name='referral_token'
     )
     token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Referral Token"
+        verbose_name_plural = "Referral Tokens"
+        ordering = ("-created_at",)
 
     def __str__(self):
         return f"{self.user.username}'s Referral Token"
 
 
-class Referral(models.Model):
+class Referral(UUIDModel):
     """
     Represents a referral made by a user using a referral token.
     """
@@ -371,7 +480,11 @@ class Referral(models.Model):
         related_name='referred_details'
     )
     token_used = models.UUIDField()
-    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Referral"
+        verbose_name_plural = "Referrals"
+        ordering = ("-created_at",)
 
     def __str__(self):
         return f"{self.referred_user.username} referred by {self.referred_by.username if self.referred_by else 'Unknown'}"
@@ -392,7 +505,7 @@ class Referral(models.Model):
             token_used=token
         )
 
-class Notification(models.Model):
+class Notification(UUIDModel):
     """
     Model representing a notification sent to a user.
     
@@ -413,10 +526,6 @@ class Notification(models.Model):
     )
     message = models.TextField(
         help_text="Content/message of the notification"
-    )
-    created_at = models.DateTimeField(
-        auto_now_add=True, 
-        help_text="When the notification was created"
     )
     is_read = models.BooleanField(
         default=False, 
