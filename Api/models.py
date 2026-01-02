@@ -183,7 +183,7 @@ class Subscription(UUIDModel):
 
 class OTP(UUIDModel):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='otp')
-    code = models.CharField(max_length=4, unique=True)
+    code = models.CharField(max_length=4)
     is_used = models.BooleanField(default=False)
     expires_at = models.DateTimeField()
 
@@ -191,6 +191,7 @@ class OTP(UUIDModel):
         verbose_name = "OTP"
         verbose_name_plural = "OTPs"
         ordering = ("-created_at",)
+        unique_together = ("user", "code")
 
     def save(self, *args, **kwargs):
         self.expires_at = timezone.now() + timezone.timedelta(hours=1)
@@ -394,26 +395,26 @@ class PackageOffer(UUIDModel):
         return f"Package Offer for {self.package_bid.package.location} to {self.package_bid.package.destination}"
 
 
-class Transaction(UUIDModel):
-    TRANSACTION_TYPE_CHOICES = [
-        ("deposit", "Deposit"),
-        ("withdrawal", "Withdrawal"),
-        ("transfer", "Transfer"),
-    ]
+# class Transaction(UUIDModel):
+#     TRANSACTION_TYPE_CHOICES = [
+#         ("deposit", "Deposit"),
+#         ("withdrawal", "Withdrawal"),
+#         ("transfer", "Transfer"),
+#     ]
 
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transactions")
-    transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPE_CHOICES)
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
-    timestamp = models.DateTimeField(default=timezone.now)
-    description = models.TextField(null=True, blank=True)
+#     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transactions")
+#     transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPE_CHOICES)
+#     amount = models.DecimalField(max_digits=12, decimal_places=2)
+#     timestamp = models.DateTimeField(default=timezone.now)
+#     description = models.TextField(null=True, blank=True)
 
-    class Meta:
-        verbose_name = "Transaction"
-        verbose_name_plural = "Transactions"
-        ordering = ("-timestamp",)
+#     class Meta:
+#         verbose_name = "Transaction"
+#         verbose_name_plural = "Transactions"
+#         ordering = ("-timestamp",)
 
-    def __str__(self):
-        return f"{self.user.email} - {self.transaction_type.capitalize()} - {self.amount}"
+#     def __str__(self):
+#         return f"{self.user.email} - {self.transaction_type.capitalize()} - {self.amount}"
 
 class Badge(UUIDModel):
     name = models.CharField(max_length=100)

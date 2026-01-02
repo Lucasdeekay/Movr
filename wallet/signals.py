@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from Api.models import User
-from Api.models import Wallet
+from Api.models import CustomUser as User
+from wallet.models import Wallet
 
 # Signal to create a Wallet for every new User
 @receiver(post_save, sender=User)

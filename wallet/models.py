@@ -12,7 +12,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.core.validators import MinValueValidator, MaxValueValidator
 
-from Api.models import User
+from Api.models import CustomUser as User
 from Api.models import UUIDModel
 
 

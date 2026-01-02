@@ -9,7 +9,7 @@ from rest_framework import serializers
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 from .models import Wallet, Transaction, Withdrawal, Bank
-from auth_app.models import User
+from Api.models import CustomUser as User
 
 import logging
 

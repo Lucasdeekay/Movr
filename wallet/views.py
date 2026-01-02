@@ -23,13 +23,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from Api.views import get_user_from_token, Notification, Wallet, Transaction
-from Api.serializers import (
+from Api.views import get_user_from_token
+from Api.models import Notification
+from wallet.models import Wallet, Transaction
+from wallet.serializers import (
     WalletSerializer, # Use WalletSerializer for full wallet details
     TransactionSerializer,
     WithdrawalRequestSerializer, # For user input
 )
-from Api.models import User # Ensure User model is correctly imported
+from Api.models import CustomUser as User # Ensure User model is correctly imported
 
 
 import logging
