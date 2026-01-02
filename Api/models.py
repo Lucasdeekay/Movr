@@ -100,7 +100,7 @@ class KYC(UUIDModel):
         ordering = ("-created_at",)
 
     def __str__(self):
-        return f"KYC for {self.user.username}"
+        return f"KYC for {self.user.email}"
 
 
 class SocialMediaLink(UUIDModel):
@@ -115,7 +115,7 @@ class SocialMediaLink(UUIDModel):
         ordering = ("-created_at",)
 
     def __str__(self):
-        return f"Social media link for {self.user.username}"
+        return f"Social media link for {self.user.email}"
 
 
 class Vehicle(UUIDModel):
@@ -135,7 +135,7 @@ class Vehicle(UUIDModel):
         ordering = ("-created_at",)
 
     def __str__(self):
-        return f"Vehicle Details for {self.user.username}"
+        return f"Vehicle Details for {self.user.email}"
 
 
 class SubscriptionPlan(UUIDModel):
@@ -440,7 +440,7 @@ class UserBadge(UUIDModel):
         ordering = ("-awarded_at",)
 
     def __str__(self):
-        return f"{self.user.username} - {self.badge.name}"
+        return f"{self.user.email} - {self.badge.name}"
 
 
 class ReferralToken(UUIDModel):
@@ -460,7 +460,7 @@ class ReferralToken(UUIDModel):
         ordering = ("-created_at",)
 
     def __str__(self):
-        return f"{self.user.username}'s Referral Token"
+        return f"{self.user.email}'s Referral Token"
 
 
 class Referral(UUIDModel):
@@ -487,7 +487,7 @@ class Referral(UUIDModel):
         ordering = ("-created_at",)
 
     def __str__(self):
-        return f"{self.referred_user.username} referred by {self.referred_by.username if self.referred_by else 'Unknown'}"
+        return f"{self.referred_user.email} referred by {self.referred_by.email if self.referred_by else 'Unknown'}"
 
     @staticmethod
     def create_referral(referred_user, token):
