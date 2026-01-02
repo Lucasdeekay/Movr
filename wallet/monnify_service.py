@@ -23,6 +23,10 @@ from typing import Dict, List, Optional
 
 from .monnify import Monnify  # our low-level client
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # --------------------------------------------------------------------------- #
 #                               Exceptions                                    #
 # --------------------------------------------------------------------------- #
@@ -95,6 +99,16 @@ class DedicatedAccountService:
     # ------------- #
     #   INTERNAL    #
     # ------------- #
+
+    def _handle_response(self, resp: Dict):
+        """Checks Monnify response for failure and raises DedicatedAccountError."""
+        if resp.get("requestSuccessful") is False:
+            # Monnify errors usually have a responseMessage and responseCode
+            error_code = resp.get("responseCode", "500")
+            error_msg = resp.get("responseMessage", "Unknown Monnify API error")
+            raise DedicatedAccountError(f"Monnify API Failure [{error_code}]: {error_msg}")
+        return resp["responseBody"] # Return the success body
+    
     def _ensure_token(self) -> str:
         if not self._token:
             resp = self._client.auth_login()
@@ -109,7 +123,6 @@ class DedicatedAccountService:
         *,
         account_name: str,
         customer_email: str,
-        customer_name: str,
         contract_code: str,
         bvn: str | None = None,
         nin: str | None = None,
@@ -123,7 +136,9 @@ class DedicatedAccountService:
         DedicatedAccount instance with populated account_number & bank details.
         """
         account_ref = str(uuid.uuid4())
+        logger.info(f"Creating dedicated account with reference: {account_ref}")
         token = self._ensure_token()
+        logger.info(f"Obtained auth token for Monnify: {token[:10]}****")
         resp = self._client.reserved_account_create(
             token,
             account_reference=account_ref,
@@ -134,7 +149,12 @@ class DedicatedAccountService:
             nin=nin,
             income_split_config=income_split_config,
         )
-        body = resp["responseBody"]
+        try:
+            body = self._handle_response(resp)
+        except DedicatedAccountError as e:
+            logger.error(f"Dedicated account creation failed for {customer_email}: {e}")
+            raise
+        logger.info(f"Dedicated account created successfully: {body}")
         bank = body["accounts"][0]  # Monnify always returns ≥1 bank
         return DedicatedAccount(
             account_reference=account_ref,
@@ -154,7 +174,7 @@ class DedicatedAccountService:
         """
         token = self._ensure_token()
         resp = self._client.reserved_account_details(token, account_reference=account_reference)
-        body = resp["responseBody"]
+        body = self._handle_response(resp)
         bank = body["accounts"][0]
         return DedicatedAccount(
             account_reference=account_reference,
@@ -165,7 +185,8 @@ class DedicatedAccountService:
             bank_name=bank["bankName"],
             bank_code=bank["bankCode"],
         )
-
+    
+    
     # ------------- #
     #   DEPOSITS    #
     # ------------- #
@@ -241,7 +262,7 @@ class DedicatedAccountService:
         """
         token = self._ensure_token()
         resp = self._client.wallet_balance(token, account_number=wallet_account)
-        body = resp["responseBody"]
+        body = self._handle_response(resp)
         return Wallet(
             account_number=wallet_account,
             available_balance=body["availableBalance"],
@@ -286,7 +307,29 @@ class DedicatedAccountService:
             for tx in content
         ]
     
-        # ------------- #
+    def transaction_status(self, transaction_reference: str) -> Dict:
+        """
+        Get the status of a specific transaction by its reference.
+
+        Returns
+        -------
+        Dict with keys: transaction_reference, amount, payment_reference, payment_status, paid_on
+        """
+        token = self._ensure_token()
+        resp = self._client.transaction_status(
+            token,
+            transaction_reference=transaction_reference,
+        )
+        body = self._handle_response(resp)
+        return {
+            "transaction_reference": body["transactionReference"],
+            "amount": body["amount"],
+            "payment_reference": body["paymentReference"],
+            "payment_status": body["paymentStatus"],
+            "paid_on": body["completedOn"],
+        }
+    
+    # ------------- #
     #   UPDATE BVN  #
     # ------------- #
     def update_bvn_on_reserved_account(
@@ -315,13 +358,52 @@ class DedicatedAccountService:
 
         token = self._ensure_token()
         try:
-            self._client.reserved_account_update_bvn(
+            resp = self._client.reserved_account_update_bvn(
                 token,
                 account_reference=account_reference,
                 bvn=bvn,
             )
+            # Check for Monnify API errors after the call
+            self._handle_response(resp)
         except Exception as exc:
             raise DedicatedAccountError(f"Failed to update BVN: {exc}")
+        
+    def fetch_banks(self) -> List[Dict]:
+        """
+        Fetch the list of banks supported by Monnify.
+
+        Returns
+        -------
+        List of Dicts with keys: name, code
+        """
+        token = self._ensure_token()
+        resp = self._client.bank(token)
+        banks = resp["responseBody"]
+        return [{"name": bank["name"], "code": bank["code"]} for bank in banks]
+    
+    def validate_account(self, account_number: str, bank_code: str) -> Dict:
+        """
+        Validate a bank account number with the given bank code.
+
+        Parameters
+        ----------
+        account_number : str
+            The bank account number to validate.
+        bank_code : str
+            The bank code corresponding to the bank.
+
+        Returns
+        -------
+        Dict with keys: account_name, account_number, bank_code
+        """
+        token = self._ensure_token()
+        resp = self._client.validate_account(token, account_number=account_number, bank_code=bank_code)
+        body = self._handle_response(resp)
+        return {
+            "account_name": body["accountName"],
+            "account_number": body["accountNumber"],
+            "bank_code": body["bankCode"],
+        }
 
 
 # --------------------------------------------------------------------------- #

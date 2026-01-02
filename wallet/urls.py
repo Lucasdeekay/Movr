@@ -8,6 +8,8 @@ from .views import (
     WithdrawalRequestView,
     TransactionDetailView,
     MonnifyWebhookView,
+    FetchBanksView,
+    ValidateAccountView,
 )
 
 # Import your ViewSet classes
@@ -61,7 +63,7 @@ urlpatterns = [
     # TransactionViewSet already provides /api/transactions/<id>/ for retrieving a single transaction.
     # The 'pk' parameter in ViewSet methods handles this.
     # So, TransactionDetailView is redundant.
-    path('transactions/<int:transaction_id>/', TransactionDetailView.as_view(), name='transaction-detail'), # REMOVE THIS
+    path('transactions/<uuid:transaction_id>/', TransactionDetailView.as_view(), name='transaction-detail'), # REMOVE THIS
 
     # 4. Withdrawal Request:
     # WithdrawalViewSet already has a 'create' method handled by the router at /api/withdrawals/
@@ -73,6 +75,15 @@ urlpatterns = [
     # This MUST be csrf_exempt. Ensure it's not authenticated with TokenAuthentication.
     # from .views import PaystackWebhookView # Assuming you create this view
     path('webhook/monnify/', MonnifyWebhookView.as_view(), name='monnify-webhook'),
+
+    # Fetch Banks:
+    # BankViewSet already provides /api/banks/ for listing banks.
+    # So, FetchBanksView is redundant.
+    path('banks/', FetchBanksView.as_view(), name='fetch-banks'), # REMOVE
+
+    # Validate Account:
+    # This is a unique action not covered by the BankViewSet.
+    path('resolve-account-number/', ValidateAccountView.as_view(), name='validate-account'),
 
     # If you still want a direct endpoint for authenticated user's wallet summary (e.g., /my-wallet/)
     # and prefer it separate from the ViewSet's /api/wallets/my-wallet/, keep this:

@@ -12,7 +12,7 @@ class WalletFilter(django_filters.FilterSet):
 
     class Meta:
         model = Wallet
-        fields = ['user_email', 'balance_gt', 'balance_lt', 'paystack_customer_code', 'dva_account_number', 'dva_bank_name']
+        fields = ['user_email', 'balance_gt', 'balance_lt', 'dva_account_number', 'dva_bank_name']
 
 
 class TransactionFilter(django_filters.FilterSet):

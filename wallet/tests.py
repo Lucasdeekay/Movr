@@ -249,7 +249,6 @@ class WalletSerializerTest(TestCase):
         self.assertIn('id', data)
         self.assertIn('user', data)
         self.assertIn('balance', data)
-        self.assertIn('paystack_customer_code', data)
 
     def test_wallet_serializer_validation(self):
         """Test wallet serializer validation."""

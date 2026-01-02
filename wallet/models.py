@@ -5,16 +5,18 @@ This module contains models for managing user wallets, transactions,
 withdrawals, and bank information with Paystack integration.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.core.validators import MinValueValidator, MaxValueValidator
 
-from Api.models import CustomUser as User
+from Api.models import User
+from Api.models import UUIDModel
 
 
-class Wallet(models.Model):
+class Wallet(UUIDModel):
     """
     Model representing a user's wallet for managing balances and virtual accounts.
     
@@ -25,7 +27,7 @@ class Wallet(models.Model):
         User, 
         on_delete=models.CASCADE, 
         related_name="wallet",
-        help_text="User account associated with this wallet",
+        help_text="User account associated with this wallet"
     )
     balance = models.DecimalField(
         max_digits=12, 
@@ -33,13 +35,6 @@ class Wallet(models.Model):
         default=0.00,
         validators=[MinValueValidator(0.00)],
         help_text="Current wallet balance"
-    )
-    paystack_customer_code = models.CharField(
-        max_length=50, 
-        unique=True, 
-        null=True, 
-        blank=True, 
-        help_text="Paystack customer code for this user"
     )
     dva_account_number = models.CharField(
         max_length=20, 
@@ -60,6 +55,12 @@ class Wallet(models.Model):
         blank=True, 
         help_text="Bank name for the DVA"
     )
+    dva_account_reference = models.CharField(
+        max_length=200, 
+        null=True, 
+        blank=True, 
+        help_text="Reference on the DVA account"
+    )
     dva_assigned_at = models.DateTimeField(
         null=True, 
         blank=True, 
@@ -67,10 +68,14 @@ class Wallet(models.Model):
     )
     updated_at = models.DateTimeField(
         auto_now=True, 
+        null=True,
+        blank=True, 
         help_text="When the wallet was last updated"
     )
     created_at = models.DateTimeField(
         auto_now_add=True, 
+        null=True,
+        blank=True, 
         help_text="When the wallet was created"
     )
 
@@ -148,7 +153,7 @@ class Wallet(models.Model):
         return cls.objects.aggregate(total=models.Sum('balance'))['total'] or 0
 
 
-class Transaction(models.Model):
+class Transaction(UUIDModel):
     """
     Model representing a transaction (deposit, withdrawal, payment) in the wallet.
     
@@ -163,6 +168,7 @@ class Transaction(models.Model):
     ]
     TRANSACTION_STATUSES = [
         ('pending', 'Pending'),
+        ('processing', 'Processing'),
         ('completed', 'Completed'),
         ('failed', 'Failed'),
         ('reversed', 'Reversed'),
@@ -171,8 +177,8 @@ class Transaction(models.Model):
     user = models.ForeignKey(
         User, 
         on_delete=models.CASCADE, 
-        related_name="wallet_transactions",
-        help_text="User who performed the transaction",
+        related_name="transactions",
+        help_text="User who performed the transaction"
     )
     transaction_type = models.CharField(
         max_length=20, 
@@ -184,7 +190,7 @@ class Transaction(models.Model):
         unique=True, 
         null=True, 
         blank=True, 
-        help_text="External reference (e.g., Paystack)"
+        help_text="External reference"
     )
     amount = models.DecimalField(
         max_digits=12, 
@@ -198,18 +204,16 @@ class Transaction(models.Model):
         default='pending', 
         help_text="Transaction status"
     )
-    paystack_transaction_id = models.CharField(
-        max_length=100,
-        null=True, 
-        blank=True, 
-        help_text="Paystack transaction ID"
-    )
     created_at = models.DateTimeField(
         auto_now_add=True, 
+        null=True,
+        blank=True, 
         help_text="When the transaction was created"
     )
     updated_at = models.DateTimeField(
         auto_now=True, 
+        null=True,
+        blank=True, 
         help_text="When the transaction was last updated"
     )
 
@@ -287,8 +291,100 @@ class Transaction(models.Model):
             status='completed'
         ).aggregate(total=models.Sum('amount'))['total'] or 0
 
+    @classmethod
+    def get_user_cumulative_transactions_last_six_months(cls, user):
+        """
+        Get cumulative completed transaction amounts for a user for the
+        previous 6 months (current month inclusive), broken down by month.
 
-class Withdrawal(models.Model):
+        Args:
+            user: User instance
+
+        Returns:
+            list: A list of dictionaries, each containing:
+                  {'month': str (YYYY-MM), 'total_amount': Decimal}
+        """
+        # Determine the current date and the start of the current month
+        today = timezone.now().date()
+        current_month_start = today.replace(day=1)
+
+        # Calculate the start date for 6 months ago (inclusive of the current month)
+        # 5 months back to include the current month (e.g., Oct 1, Sept 1, Aug 1, Jul 1, Jun 1, May 1)
+        six_months_ago_start = current_month_start - relativedelta(months=5)
+
+        monthly_data = []
+
+        # Loop through the last 6 months
+        for i in range(6):
+            # Calculate the start date of the current month in the loop
+            month_start = six_months_ago_start + relativedelta(months=i)
+            # Calculate the end date of the current month in the loop (one day before the next month)
+            next_month_start = month_start + relativedelta(months=1)
+            month_end = next_month_start - relativedelta(days=1)
+
+            # Filter and aggregate
+            total_amount = cls.objects.filter(
+                user=user,
+                status='completed',
+                created_at__date__gte=month_start,
+                created_at__date__lte=month_end,
+            ).aggregate(total=sum('amount'))['total'] or 0
+
+            monthly_data.append({
+                'month': month_start.strftime('%Y-%m'),  # Format as YYYY-MM
+                'total_amount': total_amount
+            })
+
+        return monthly_data
+
+    @classmethod
+    def get_user_current_month_summary(cls, user):
+        """
+        Calculates the total income (Deposits) and total outcome (Withdrawals + Transfers)
+        for a user in the current calendar month.
+
+        Args:
+            user: User instance
+
+        Returns:
+            dict: {'income': Decimal, 'outcome': Decimal}
+        """
+        today = timezone.now().date()
+        
+        # Calculate the start and end of the current month
+        month_start = today.replace(day=1)
+        # Find the start of the next month, then subtract one day to get the end of the current month
+        next_month_start = month_start + relativedelta(months=1)
+        month_end = next_month_start - relativedelta(days=1)
+
+        # 1. Calculate Total Income (Completed Deposits)
+        total_income = cls.objects.filter(
+            user=user,
+            transaction_type='deposit',
+            status='completed',
+            created_at__date__gte=month_start,
+            created_at__date__lte=month_end,
+        ).aggregate(total=sum('amount'))['total'] or 0
+
+        # 2. Calculate Total Outcome (Completed Withdrawals and Transfers)
+        # Outcome is defined as money leaving the wallet.
+        outcome_types = ['withdrawal', 'transfer']
+        total_outcome = cls.objects.filter(
+            user=user,
+            transaction_type__in=outcome_types,
+            status='completed',
+            created_at__date__gte=month_start,
+            created_at__date__lte=month_end,
+        ).aggregate(total=sum('amount'))['total'] or 0
+        
+        return {
+            'income': total_income,
+            'outcome': total_outcome,
+        }
+
+
+
+class Withdrawal(UUIDModel):
     """
     Model representing a withdrawal request from a user's wallet.
     
@@ -329,24 +425,12 @@ class Withdrawal(models.Model):
         validators=[MinValueValidator(100.00)],
         help_text="Withdrawal amount"
     )
-    paystack_recipient_code = models.CharField(
-        max_length=50, 
-        null=True, 
-        blank=True, 
-        help_text="Paystack Transfer Recipient Code"
-    )
-    paystack_transfer_reference = models.CharField(
+    transfer_reference = models.CharField(
         max_length=50, 
         unique=True, 
         null=True, 
         blank=True, 
         help_text="Unique reference for Paystack transfer"
-    )
-    paystack_transfer_id = models.CharField(
-        max_length=100,
-        null=True, 
-        blank=True, 
-        help_text="Paystack internal Transfer ID"
     )
     status = models.CharField(
         max_length=10, 
@@ -361,10 +445,14 @@ class Withdrawal(models.Model):
     )
     created_at = models.DateTimeField(
         auto_now_add=True, 
+        null=True,
+        blank=True, 
         help_text="When the withdrawal was created"
     )
     updated_at = models.DateTimeField(
         auto_now=True, 
+        null=True,
+        blank=True, 
         help_text="When the withdrawal was last updated"
     )
 
@@ -446,7 +534,7 @@ class Withdrawal(models.Model):
         return queryset
 
 
-class Bank(models.Model):
+class Bank(UUIDModel):
     """
     Model representing a bank supported for wallet withdrawals.
     
@@ -455,12 +543,10 @@ class Bank(models.Model):
     """
     name = models.CharField(
         max_length=100, 
-        unique=True, 
         help_text="Bank name"
     )
     code = models.CharField(
         max_length=10, 
-        unique=True, 
         help_text="Bank code (e.g., NUBAN code)"
     )
     slug = models.CharField(
@@ -476,10 +562,14 @@ class Bank(models.Model):
     )
     added_at = models.DateTimeField(
         auto_now_add=True, 
+        null=True,
+        blank=True, 
         help_text="When the bank was added"
     )
     updated_at = models.DateTimeField(
         auto_now=True, 
+        null=True,
+        blank=True, 
         help_text="When the bank was last updated"
     )
 
@@ -522,5 +612,4 @@ class Bank(models.Model):
             return cls.objects.get(code=code, is_active=True)
         except cls.DoesNotExist:
             return None
-
 

@@ -24,6 +24,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import TokenAuthentication
 
 from wallet.models import Transaction, Wallet
+from wallet.services import create_dedicated_account_for_user
 from .models import Route, ScheduledRoute, Day, Package, Bid, PackageOffer, QRCode
 from .models import CustomUser, KYC, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink
 from .serializers import CustomUserSerializer, OTPVerificationSerializer, TokenSerializer, VehicleSerializer, \
@@ -501,6 +502,8 @@ class UpdateKYCView(APIView):
 
         # Initialize the serializer with the existing KYC data and the new data
         serializer = KYCSerializer(kyc, data=data, partial=True)
+        
+        create_dedicated_account_for_user(user)
 
         if serializer.is_valid():
             serializer.save()  # Save the updated KYC data

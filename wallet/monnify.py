@@ -310,6 +310,17 @@ class Monnify:
             json=body,
         )
 
+    def disburse_bulk_status(self, token: str, *, batch_reference: str) -> dict:
+        """
+        GET /api/v2/disbursements/batch/summary
+        """
+        return self._request(
+            "GET",
+            "/api/v2/disbursements/batch/summary",
+            headers=self._bearer_header(token),
+            params={"batchReference": batch_reference},
+        )
+
     def disburse_validate_otp(
         self, token: str, *, reference: str, authorization_code: str
     ) -> dict:
@@ -429,6 +440,76 @@ class Monnify:
             "/api/v1/bank-transfer/reserved-accounts/transactions",
             headers=self._bearer_header(token),
             params={"accountReference": account_reference, "page": page, "size": size},
+        )
+
+    def reserved_account_all(
+        self,
+        token: str,
+        *,
+        page: int = 0,
+        size: int = 10,
+        account_number: str | None = None,
+        account_name: str | None = None,
+        customer_email: str | None = None,
+        status: str | None = None,
+    ) -> dict:
+        """
+        GET /api/v2/bank-transfer/reserved-accounts/all
+        """
+        params = {
+            "page": page,
+            "size": size,
+            "accountNumber": account_number,
+            "accountName": account_name,
+            "customerEmail": customer_email,
+            "status": status,
+        }
+        return self._request(
+            "GET",
+            "/api/v2/bank-transfer/reserved-accounts/all",
+            headers=self._bearer_header(token),
+            params={k: v for k, v in params.items() if v is not None},
+        )
+
+    def reserved_account_validate(
+        self,
+        token: str,
+        *,
+        account_number: str,
+        bank_code: str,
+        name: str,
+    ) -> dict:
+        """
+        POST /api/v1/bank-transfer/reserved-accounts/validate
+        """
+        body = {
+            "accountNumber": account_number,
+            "bankCode": bank_code,
+            "name": name,
+        }
+        return self._request(
+            "POST",
+            "/api/v1/bank-transfer/reserved-accounts/validate",
+            headers=self._bearer_header(token),
+            json=body,
+        )
+        
+    def reserved_account_split_config(
+        self,
+        token: str,
+        *,
+        account_reference: str,
+        income_split_config: list[dict],
+    ) -> dict:
+        """
+        PUT /api/v1/bank-transfer/reserved-accounts/{account_reference}/income-split-config
+        """
+        ref = _urlparse.quote(account_reference)
+        return self._request(
+            "PUT",
+            f"/api/v1/bank-transfer/reserved-accounts/{ref}/income-split-config",
+            headers=self._bearer_header(token),
+            json={"incomeSplitConfig": income_split_config},
         )
 
     # ========================= #
@@ -557,7 +638,7 @@ class Monnify:
     # ========================= #
     #  BANKS & UTILITIES        #
     # ========================= #
-    def banks(self, token: str) -> dict:
+    def bank(self, token: str) -> dict:
         """
         GET /api/v1/banks
         """

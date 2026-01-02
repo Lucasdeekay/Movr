@@ -96,7 +96,7 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = CustomPagination
     filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter)
     filterset_fields = ['transaction_type', 'status', 'created_at']
-    search_fields = ['reference', 'paystack_transaction_id']
+    search_fields = ['reference',]
     ordering_fields = ['amount', 'created_at', 'updated_at']
     ordering = ['-created_at']
     permission_classes = [IsAuthenticated]
@@ -134,7 +134,7 @@ class WithdrawalViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPagination
     filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter)
     filterset_fields = ['status', 'bank_name', 'created_at']
-    search_fields = ['bank_name', 'account_number', 'paystack_transfer_reference']
+    search_fields = ['bank_name', 'account_number', 'transfer_reference']
     ordering_fields = ['amount', 'created_at', 'updated_at']
     ordering = ['-created_at']
     permission_classes = [IsAuthenticated]
@@ -200,4 +200,5 @@ class BankViewSet(viewsets.ReadOnlyModelViewSet):
                 {"message": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
 

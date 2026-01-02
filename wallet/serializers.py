@@ -9,7 +9,7 @@ from rest_framework import serializers
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 from .models import Wallet, Transaction, Withdrawal, Bank
-from Api.models import CustomUser as User
+from auth_app.models import User
 
 import logging
 
@@ -39,12 +39,12 @@ class WalletSerializer(serializers.ModelSerializer):
     class Meta:
         model = Wallet
         fields = (
-            'id', 'user', 'balance', 'paystack_customer_code',
+            'id', 'user', 'balance',
             'dva_account_number', 'dva_account_name', 'dva_bank_name',
             'dva_assigned_at', 'updated_at', 'created_at'
         )
         read_only_fields = (
-            'id', 'user', 'balance', 'paystack_customer_code',
+            'id', 'user', 'balance',
             'dva_account_number', 'dva_account_name', 'dva_bank_name',
             'dva_assigned_at', 'updated_at', 'created_at'
         )
@@ -73,10 +73,10 @@ class TransactionSerializer(serializers.ModelSerializer):
         model = Transaction
         fields = (
             'id', 'user', 'amount', 'transaction_type', 'reference',
-            'status', 'paystack_transaction_id', 'created_at', 'updated_at'
+            'status', 'created_at', 'updated_at'
         )
         read_only_fields = (
-            'id', 'user', 'status', 'reference', 'paystack_transaction_id',
+            'id', 'user', 'status', 'reference',
             'created_at', 'updated_at'
         )
         extra_kwargs = {
@@ -198,14 +198,14 @@ class WithdrawalDetailSerializer(serializers.ModelSerializer):
         model = Withdrawal
         fields = [
             'id', 'user', 'bank_name', 'account_number', 'account_name',
-            'amount', 'status', 'paystack_recipient_code',
-            'paystack_transfer_reference', 'paystack_transfer_id',
+            'amount', 'status',
+            'transfer_reference',
             'failure_reason', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'user', 'bank_name', 'account_number', 'account_name',
-            'amount', 'status', 'paystack_recipient_code',
-            'paystack_transfer_reference', 'paystack_transfer_id',
+            'amount', 'status',
+            'transfer_reference',
             'failure_reason', 'created_at', 'updated_at'
         ]
 
@@ -335,3 +335,4 @@ class TransactionHistorySerializer(serializers.ModelSerializer):
         Returns amount formatted with Nigerian Naira symbol.
         """
         return f"₦{obj.amount:,.2f}"
+

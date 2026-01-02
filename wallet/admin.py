@@ -23,7 +23,7 @@ class WalletAdmin(admin.ModelAdmin):
     user information, and Paystack integration details.
     """
     list_display = [
-        'get_user_email', 'get_balance_display', 'get_paystack_customer_code',
+        'get_user_email', 'get_balance_display',
         'get_dva_info', 'created_at', 'updated_at'
     ]
     list_filter = [
@@ -31,10 +31,10 @@ class WalletAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         'user__email', 'user__first_name', 'user__last_name',
-        'paystack_customer_code', 'dva_account_number'
+        'dva_account_number'
     ]
     readonly_fields = [
-        'user', 'paystack_customer_code', 'dva_account_number',
+        'user', 'dva_account_number',
         'dva_account_name', 'dva_bank_name', 'dva_assigned_at',
         'created_at', 'updated_at'
     ]
@@ -47,10 +47,6 @@ class WalletAdmin(admin.ModelAdmin):
         }),
         ('Balance Information', {
             'fields': ('balance',)
-        }),
-        ('Paystack Integration', {
-            'fields': ('paystack_customer_code',),
-            'classes': ('collapse',)
         }),
         ('Dedicated Virtual Account', {
             'fields': ('dva_account_number', 'dva_account_name', 'dva_bank_name', 'dva_assigned_at'),
@@ -73,13 +69,6 @@ class WalletAdmin(admin.ModelAdmin):
         return f"₦{obj.balance:,.2f}"
     get_balance_display.short_description = 'Balance'
     get_balance_display.admin_order_field = 'balance'
-
-    def get_paystack_customer_code(self, obj):
-        """Get Paystack customer code with formatting."""
-        if obj.paystack_customer_code:
-            return format_html('<span style="color: green;">✓</span> {}', obj.paystack_customer_code)
-        return format_html('<span style="color: red;">✗</span> Not assigned')
-    get_paystack_customer_code.short_description = 'Paystack Customer'
 
     def get_dva_info(self, obj):
         """Get DVA information with formatting."""
@@ -126,10 +115,10 @@ class TransactionAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         'user__email', 'user__first_name', 'user__last_name',
-        'reference', 'paystack_transaction_id'
+        'reference'
     ]
     readonly_fields = [
-        'user', 'reference', 'paystack_transaction_id',
+        'user', 'reference',
         'created_at', 'updated_at'
     ]
     ordering = ['-created_at']
@@ -143,7 +132,7 @@ class TransactionAdmin(admin.ModelAdmin):
             'fields': ('transaction_type', 'amount', 'status')
         }),
         ('Reference Information', {
-            'fields': ('reference', 'paystack_transaction_id'),
+            'fields': ('reference',),
             'classes': ('collapse',)
         }),
         ('Timestamps', {
@@ -239,11 +228,11 @@ class WithdrawalAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         'user__email', 'user__first_name', 'user__last_name',
-        'bank_name', 'account_number', 'paystack_transfer_reference'
+        'bank_name', 'account_number', 'transfer_reference'
     ]
     readonly_fields = [
-        'user', 'paystack_recipient_code', 'paystack_transfer_reference',
-        'paystack_transfer_id', 'created_at', 'updated_at'
+        'user', 'transfer_reference',
+        'created_at', 'updated_at'
     ]
     ordering = ['-created_at']
     list_per_page = 25
@@ -258,8 +247,8 @@ class WithdrawalAdmin(admin.ModelAdmin):
         ('Withdrawal Details', {
             'fields': ('amount', 'status', 'failure_reason')
         }),
-        ('Paystack Integration', {
-            'fields': ('paystack_recipient_code', 'paystack_transfer_reference', 'paystack_transfer_id'),
+        ('Monnify Integration', {
+            'fields': ('transfer_reference',),
             'classes': ('collapse',)
         }),
         ('Timestamps', {
@@ -311,8 +300,8 @@ class WithdrawalAdmin(admin.ModelAdmin):
 
     def get_reference_display(self, obj):
         """Get reference with formatting."""
-        if obj.paystack_transfer_reference:
-            return format_html('<code>{}</code>', obj.paystack_transfer_reference)
+        if obj.transfer_reference:
+            return format_html('<code>{}</code>', obj.transfer_reference)
         return 'N/A'
     get_reference_display.short_description = 'Reference'
 
@@ -404,3 +393,4 @@ class BankAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         """Disable bank deletion."""
         return False
+
