@@ -42,8 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
-    # 'coreapi',  # Coreapi for coreapi documentation
-    # 'drf_yasg',  # drf_yasg fro Swagger documentation
+    'drf_spectacular',
     'channels',
     'Api',
     'wallet',
@@ -166,15 +165,15 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # Configure DRF settings
-# REST_FRAMEWORK = {
-#     'DEFAULT_AUTHENTICATION_CLASSES': [
-#         'rest_framework.authentication.TokenAuthentication',
-#     ],
-#     'DEFAULT_PERMISSION_CLASSES': [
-#         'rest_framework.permissions.IsAuthenticated',
-#     ],
-#     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
-# }
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
 
 AUTH_USER_MODEL = 'Api.CustomUser'
 
@@ -230,3 +229,22 @@ MONNIFY_API_KEY= config("MONNIFY_API_KEY")
 MONNIFY_SECRET_KEY= config("MONNIFY_SECRET_KEY")
 MONNIFY_CONTRACT_CODE= config("MONNIFY_CONTRACT_CODE")
 MONNIFY_MAIN_ACCOUNT_NUMBER= config("MONNIFY_MAIN_ACCOUNT_NUMBER")
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Movr API',
+    'DESCRIPTION': 'Backend API documentation for Movr platform',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+
+    'CONTACT': {
+        'name': 'Movr API Support',
+        'email': 'support@movr.com',
+    },
+
+    'LICENSE': {
+        'name': 'MIT',
+    },
+
+    # Optional but recommended
+    'COMPONENT_SPLIT_REQUEST': True,
+}
