@@ -96,6 +96,8 @@ class RegisterView(APIView):
             "password": "password123",
         }
     """
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True), name='post')
@@ -153,6 +155,8 @@ class VerifyOTPView(APIView):
             "code": code,
         }
     """
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
@@ -195,6 +199,8 @@ class VerifyOTPView(APIView):
 
 
 class ResendOTPView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
@@ -247,6 +253,8 @@ class LoginView(APIView):
             'password': 'password123'
         }
     """
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
