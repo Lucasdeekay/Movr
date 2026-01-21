@@ -124,11 +124,14 @@ class RegisterView(APIView):
                 user.set_password(request.data.get('password'))
                 user.save()
 
-                # Create default KYC, Vehicle, and free Subscription
+# Create default KYC, Vehicle, and free Subscription
                 KYC.objects.create(user=user)
                 Vehicle.objects.create(user=user)
                 free_plan, _ = SubscriptionPlan.objects.get_or_create(name="free")
-                Subscription.objects.create(user=user, plan=free_plan)
+                # Set end date to 3 days from now for free plan
+                subscription = Subscription.objects.create(user=user, plan=free_plan)
+                subscription.end_date = timezone.now().date() + timedelta(days=3)
+                subscription.save()
 
                 # Generate and send OTP for email verification
                 otp = OTP.objects.create(user=user)
@@ -619,6 +622,66 @@ class UpdateVehicleInfoView(APIView):
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProfileImageUploadView(APIView):
+    """
+    API view for uploading user profile image.
+    
+    This view allows authenticated users to upload or update their profile picture.
+    The view validates that the uploaded file is an image and within size limits.
+    """
+
+    authentication_classes = [TokenAuthentication]
+    parser_classes = [MultiPartParser, FormParser]  # To handle file uploads
+
+    def post(self, request, *args, **kwargs):
+        """
+        Handle POST requests for profile image upload.
+        
+        Args:
+            request: The HTTP request object containing the profile image file.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Response: A Response object indicating the result of the profile image upload.
+        """
+        user = get_user_from_token(request)  # Retrieve the authenticated user
+        
+        # Check if profile_picture is provided in the request
+        if 'profile_picture' not in request.FILES:
+            return Response(
+                {'error': 'Profile picture is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        profile_picture = request.FILES['profile_picture']
+        
+        # Validate that the file is an image
+        if not profile_picture.content_type.startswith('image'):
+            return Response(
+                {'error': 'Profile picture must be a valid image file.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate file size (limit to 5MB)
+        if profile_picture.size > 5 * 1024 * 1024:
+            return Response(
+                {'error': 'Profile picture size must be under 5MB.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update user's profile picture
+        user.profile_picture = profile_picture
+        user.save()
+        
+        # Return updated user data
+        serializer = CustomUserSerializer(user)
+        return Response({
+            'message': 'Profile picture uploaded successfully.',
+            'user': serializer.data
+        }, status=status.HTTP_200_OK)
 
 
 class UpdatePersonalInfoView(APIView):

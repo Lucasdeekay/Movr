@@ -6,6 +6,7 @@ from datetime import timedelta, datetime
 
 import pytest
 from PIL import Image
+from io import BytesIO
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -132,10 +133,15 @@ class RegisterViewTestCase(APITestCase):
         # Check that the password was set
         self.assertTrue(user.check_password(data['password']))
 
-        # Verify KYC, Vehicle, and Subscription objects are created
+# Verify KYC, Vehicle, and Subscription objects are created
         self.assertTrue(KYC.objects.filter(user=user).exists())
         self.assertTrue(Vehicle.objects.filter(user=user).exists())
         self.assertTrue(Subscription.objects.filter(user=user, plan=self.free_plan).exists())
+
+        # Check that the subscription end date is set to 3 days from now
+        subscription = Subscription.objects.get(user=user, plan=self.free_plan)
+        expected_end_date = timezone.now().date() + timedelta(days=3)
+        self.assertEqual(subscription.end_date, expected_end_date)
 
         # Check that an OTP was generated and associated with the user
         self.assertTrue(OTP.objects.filter(user=user).exists())
@@ -1294,11 +1300,115 @@ class CreateRouteViewTestCase(APITestCase):
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
             self.assertEqual(response.data["message"], "Route created successfully.")
 
-            # Verify the route was created with the ticket image
+# Verify the route was created with the ticket image
             route = Route.objects.filter(user=self.user, location=data['location'],
                                          destination=data['destination']).first()
             self.assertIsNotNone(route)
             self.assertIsNotNone(route.ticket_image)
+
+    def test_route_creation_with_null_stop_location(self):
+        """
+        Test that route can be created with null/empty stop location values.
+        """
+        data = {
+            "location": "Location A",
+            "location_latitude": 40.712776,
+            "location_longitude": -74.005974,
+            "destination": "Location B",
+            "destination_latitude": 34.052235,
+            "destination_longitude": -118.243683,
+            "stop_location": "",  # Empty string
+            "stop_location_latitude": None,  # Null value
+            "stop_location_longitude": None,  # Null value
+            "transportation_mode": "car",
+            "departure_time": timezone.now().isoformat(),
+            "service_type": "ride",
+        }
+
+        response = self.client.post(self.url, data, format='json')
+
+        # Check for a successful response
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["message"], "Route created successfully.")
+
+        # Verify that route was created with null stop location values
+        route = Route.objects.filter(user=self.user, location=data['location'], 
+                                destination=data['destination']).first()
+        self.assertIsNotNone(route)
+        
+        # Verify stop location fields accept null/empty values
+        self.assertEqual(route.stop_location, "")  # Empty string should be stored
+        self.assertIsNone(route.stop_location_latitude)  # Null should be stored
+        self.assertIsNone(route.stop_location_longitude)  # Null should be stored
+
+    def test_route_creation_with_partial_stop_location(self):
+        """
+        Test that route can be created with partial stop location data.
+        """
+        data = {
+            "location": "Location A",
+            "location_latitude": 40.712776,
+            "location_longitude": -74.005974,
+            "destination": "Location B",
+            "destination_latitude": 34.052235,
+            "destination_longitude": -118.243683,
+            "stop_location": "Stop Location C",  # Only name provided
+            # latitude and longitude omitted (should be null)
+            "transportation_mode": "car",
+            "departure_time": timezone.now().isoformat(),
+            "service_type": "ride",
+        }
+
+        response = self.client.post(self.url, data, format='json')
+
+        # Check for a successful response
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["message"], "Route created successfully.")
+
+        # Verify that route was created with partial stop location
+        route = Route.objects.filter(user=self.user, location=data['location'], 
+                                destination=data['destination']).first()
+        self.assertIsNotNone(route)
+        
+        # Verify stop location
+        self.assertEqual(route.stop_location, "Stop Location C")
+        self.assertIsNone(route.stop_location_latitude)  # Should be null when not provided
+        self.assertIsNone(route.stop_location_longitude)  # Should be null when not provided
+
+    def test_route_creation_with_full_stop_location(self):
+        """
+        Test that route can be created with complete stop location data.
+        """
+        data = {
+            "location": "Location A",
+            "location_latitude": 40.712776,
+            "location_longitude": -74.005974,
+            "destination": "Location B",
+            "destination_latitude": 34.052235,
+            "destination_longitude": -118.243683,
+            "stop_location": "Stop Location C",
+            "stop_location_latitude": 39.952583,
+            "stop_location_longitude": -75.165222,
+            "transportation_mode": "car",
+            "departure_time": timezone.now().isoformat(),
+            "service_type": "ride",
+        }
+
+        response = self.client.post(self.url, data, format='json')
+
+        # Check for a successful response
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["message"], "Route created successfully.")
+
+        # Verify that route was created with complete stop location
+        route = Route.objects.filter(user=self.user, location=data['location'], 
+                                destination=data['destination']).first()
+        self.assertIsNotNone(route)
+        
+        # Verify stop location fields
+        self.assertEqual(route.stop_location, "Stop Location C")
+        self.assertEqual(float(route.stop_location_latitude), 39.952583)
+        self.assertEqual(float(route.stop_location_longitude), -75.165222)
 
 
 class CreateScheduledRouteViewTestCase(APITestCase):
@@ -1833,13 +1943,13 @@ class PlaceBidViewTest(APITestCase):
         """
         Test placing a bid on a non-existing package.
         """
-        # Use a non-existing package_id (assume 99999 doesn't exist)
-        invalid_url = reverse('place-bid', kwargs={'package_id': 99999})
+        # Use a non-existing package_id (valid UUID format but doesn't exist)
+        invalid_url = reverse('place-bid', kwargs={'package_id': '12345678-1234-1234-1234-123456789abc'})
 
         # Send POST request with a price
         response = self.client.post(invalid_url, {'price': 100.00})
 
-        # Assert the response status code and error message
+        # Assert that response status code and error message
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.data, {'error': 'Package not found.'})
 
@@ -2382,10 +2492,132 @@ class DeliveryConfirmationViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['error'], "Invalid code.")
 
-    def test_delivery_confirmation_unauthorized_user(self):
+def test_delivery_confirmation_unauthorized_user(self):
         """
         Test that an unauthorized user (not the mover or package owner) cannot confirm the delivery.
         """
         response = self.client.post(self.url, {'code': '12345'})
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class ProfileImageUploadViewTestCase(APITestCase):
+    """
+    Test cases for the ProfileImageUploadView API view.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.url = reverse('upload-profile-image')
+        
+        # Create a test user and token
+        self.user = CustomUser.objects.create_user(
+            email="testuser@example.com",
+            password="password123",
+        )
+        self.token = Token.objects.create(user=self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+
+    def tearDown(self):
+        return super().tearDown()
+
+    def test_successful_profile_image_upload(self):
+        """
+        Test that a valid profile image upload is successful.
+        """
+        # Create a temporary image file
+        image = Image.new('RGB', (100, 100), 'red')
+        image_file = BytesIO()
+        image.save(image_file, 'jpeg')
+        image_file.seek(0)
+        
+        # Upload the image
+        response = self.client.post(
+            self.url,
+            {'profile_picture': SimpleUploadedFile(
+                'test_image.jpg',
+                image_file.getvalue(),
+                content_type='image/jpeg'
+            )},
+            format='multipart'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('message', response.data)
+        self.assertEqual(response.data['message'], 'Profile picture uploaded successfully.')
+        self.assertIn('user', response.data)
+        
+        # Verify the user's profile picture was updated
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.profile_picture)
+        self.assertTrue(self.user.profile_picture.name.endswith('.jpg'))
+
+    def test_profile_image_upload_missing_file(self):
+        """
+        Test that upload fails when no profile picture is provided.
+        """
+        response = self.client.post(self.url, {}, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Profile picture is required.')
+
+    def test_profile_image_upload_invalid_file_type(self):
+        """
+        Test that upload fails when file is not an image.
+        """
+        # Upload a text file instead of image
+        response = self.client.post(
+            self.url,
+            {'profile_picture': SimpleUploadedFile(
+                'test_file.txt',
+                b'This is not an image',
+                content_type='text/plain'
+            )},
+            format='multipart'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Profile picture must be a valid image file.')
+
+    def test_profile_image_upload_file_too_large(self):
+        """
+        Test that upload fails when file size exceeds 5MB limit.
+        """
+        # Create a file larger than 5MB (6MB of dummy data)
+        large_file_content = b'x' * (6 * 1024 * 1024)  # 6MB of 'x' characters
+        
+        response = self.client.post(
+            self.url,
+            {'profile_picture': SimpleUploadedFile(
+                'large_file.jpg',
+                large_file_content,
+                content_type='image/jpeg'
+            )},
+            format='multipart'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Profile picture size must be under 5MB.')
+
+    def test_profile_image_upload_unauthorized(self):
+        """
+        Test that unauthorized users cannot upload profile images.
+        """
+        # Remove authentication
+        self.client.credentials()
+        
+        image = Image.new('RGB', (100, 100), 'red')
+        image_file = BytesIO()
+        image.save(image_file, 'jpeg')
+        image_file.seek(0)
+        
+        response = self.client.post(
+            self.url,
+            {'profile_picture': SimpleUploadedFile(
+                'test_image.jpg',
+                image_file.getvalue(),
+                content_type='image/jpeg'
+            )},
+            format='multipart'
+        )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
