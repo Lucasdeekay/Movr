@@ -8,7 +8,7 @@ import hashlib
 import os
 from django.http import HttpResponse
 from django.utils import timezone
-import json # Import json for Paystack response parsing
+import json
 
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -22,16 +22,17 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema
 
 from Api.views import get_user_from_token
 from Api.models import Notification
 from wallet.models import Wallet, Transaction
 from wallet.serializers import (
-    WalletSerializer, # Use WalletSerializer for full wallet details
+    WalletSerializer,
     TransactionSerializer,
-    WithdrawalRequestSerializer, # For user input
+    WithdrawalRequestSerializer,
 )
-from Api.models import CustomUser as User # Ensure User model is correctly imported
+from Api.models import CustomUser as User
 
 
 import logging
@@ -64,6 +65,19 @@ class WalletDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Get wallet details",
+        description="Get wallet details and recent transactions for authenticated user.",
+        responses={
+            200: {
+                'type': 'object',
+                'properties': {
+                    'wallet_details': WalletSerializer,
+                    'recent_transactions': TransactionSerializer(many=True)
+                }
+            }
+        }
+    )
     def get(self, request):
         user = get_user_from_token(request)
         wallet, _ = Wallet.objects.get_or_create(user=user)
@@ -85,6 +99,11 @@ class AllTransactionsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Get all transactions",
+        description="Get all transactions for the authenticated user.",
+        responses={200: TransactionSerializer(many=True)}
+    )
     def get(self, request):
         user = get_user_from_token(request)
         txs = Transaction.objects.filter(user=user).order_by("-created_at")
@@ -96,9 +115,17 @@ class AllTransactionsView(APIView):
 @method_decorator(cache_page(60 * 2), name='get')
 class TransactionDetailView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated] # Enable permission
+    permission_classes = [IsAuthenticated]
 
-    def get(self, request, pk): # Use 'pk' (primary key) for detail view conventions
+    @extend_schema(
+        summary="Get transaction detail",
+        description="Get details of a specific transaction.",
+        responses={
+            200: TransactionSerializer,
+            404: {'description': 'Transaction not found'}
+        }
+    )
+    def get(self, request, pk):
         try:
             user = get_user_from_token(request)
 
@@ -122,6 +149,15 @@ class WithdrawalRequestView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Request withdrawal",
+        description="Request a withdrawal from wallet to bank account.",
+        request=WithdrawalRequestSerializer,
+        responses={
+            201: {'description': 'Withdrawal initiated'},
+            400: {'description': 'Invalid request or insufficient funds'}
+        }
+    )
     def post(self, request):
         user = get_user_from_token(request)
         serializer = WithdrawalRequestSerializer(data=request.data)
@@ -140,7 +176,7 @@ class WithdrawalRequestView(APIView):
         
 
 
-@method_decorator(csrf_exempt, name='dispatch') # Disable CSRF for webhook endpoint
+@method_decorator(csrf_exempt, name='dispatch')
 class MonnifyWebhookView(APIView):
     """
     POST  /webhooks/monnify/
@@ -149,6 +185,12 @@ class MonnifyWebhookView(APIView):
     authentication_classes = []
     permission_classes = []
 
+    @extend_schema(
+        summary="Monnify webhook",
+        description="Webhook endpoint for Monnify payment notifications.",
+        methods=["POST"],
+        exclude=True
+    )
     def post(self, request, *args, **kwargs):
         sig = request.headers.get("monnify-signature")
         if not _verify_monnify_signature(request.body, sig):
@@ -281,17 +323,38 @@ class MonnifyWebhookView(APIView):
 
 @method_decorator(cache_page(60 * 2), name='get')
 class FetchBanksView(APIView):
-    authentication_classes = [] # No authentication for webhooks
-    permission_classes = []     # No permissions for webhooks
+    authentication_classes = []
+    permission_classes = []
 
+    @extend_schema(
+        summary="Fetch banks",
+        description="Get list of active banks for withdrawals.",
+        responses={200: {'type': 'object', 'properties': {'banks': {'type': 'array'}}}}
+    )
     def get(self, request, *args, **kwargs):
         bank_list = get_active_banks()
         return Response({"banks": bank_list}, status=status.HTTP_200_OK)
     
 class ValidateAccountView(APIView):
-    authentication_classes = [] # No authentication for webhooks
-    permission_classes = []     # No permissions for webhooks
+    authentication_classes = []
+    permission_classes = []
 
+    @extend_schema(
+        summary="Validate account",
+        description="Validate bank account details using account number and bank code.",
+        request={
+            'type': 'object',
+            'properties': {
+                'account_number': {'type': 'string'},
+                'bank_code': {'type': 'string'}
+            },
+            'required': ['account_number', 'bank_code']
+        },
+        responses={
+            200: {'description': 'Account details retrieved'},
+            400: {'description': 'Invalid account details'}
+        }
+    )
     def post(self, request, *args, **kwargs):
         account_number = request.data.get("account_number")
         bank_code = request.data.get("bank_code")

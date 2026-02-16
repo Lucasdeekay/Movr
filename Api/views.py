@@ -14,7 +14,7 @@ from django_ratelimit.decorators import ratelimit
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-# from rest_framework.decorators import permission_classes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
@@ -90,15 +90,16 @@ class RegisterView(APIView):
     creates a new user, initializes associated KYC, Vehicle, and Subscription objects,
     and sends an OTP for email verification. Rate limiting is applied to restrict
     the number of registration attempts from the same IP address.
-
-    data : {
-            "email": "newuser@example.com",
-            "password": "password123",
-        }
     """
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        summary="Register new user",
+        description="Register a new user with email and password. Returns user data and sends OTP for verification.",
+        request=CustomUserSerializer,
+        responses={200: CustomUserSerializer, 400: dict, 500: dict}
+    )
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True), name='post')
     def post(self, request, *args, **kwargs):
@@ -152,15 +153,26 @@ class VerifyOTPView(APIView):
     It checks if the provided OTP is valid, not used, and not expired.
     If the OTP is valid, it marks it as used and updates the user's email verification status.
     Rate limiting is applied to restrict the number of verification attempts from the same IP address.
-
-    data : {
-            "email": email,
-            "code": code,
-        }
     """
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        summary="Verify OTP",
+        description="Verify the One-Time Password sent to user's email for email verification.",
+        request={
+            'type': 'object',
+            'properties': {
+                'email': {'type': 'string', 'format': 'email'},
+                'code': {'type': 'string', 'description': '6-digit OTP code'}
+            },
+            'required': ['email', 'code']
+        },
+        responses={
+            200: {'description': 'Email verified successfully'},
+            400: {'description': 'Invalid OTP, already used, or expired'}
+        }
+    )
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     def post(self, request, *args, **kwargs):
@@ -205,6 +217,21 @@ class ResendOTPView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        summary="Resend OTP",
+        description="Resend a One-Time Password to the user's email address.",
+        request={
+            'type': 'object',
+            'properties': {
+                'email': {'type': 'string', 'format': 'email'}
+            },
+            'required': ['email']
+        },
+        responses={
+            200: {'description': 'OTP sent to email'},
+            400: {'description': 'Invalid email'}
+        }
+    )
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     def post(self, request, *args, **kwargs):
@@ -250,15 +277,26 @@ class LoginView(APIView):
     If the credentials are valid and the user's email is verified, a token is generated
     for the user, and their information is returned in the response. Rate limiting is applied
     to restrict the number of login attempts from the same IP address.
-
-    data : {
-            'email': email,
-            'password': 'password123'
-        }
     """
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        summary="User login",
+        description="Authenticate user with email and password. Returns token and user data.",
+        request={
+            'type': 'object',
+            'properties': {
+                'email': {'type': 'string', 'format': 'email'},
+                'password': {'type': 'string'}
+            },
+            'required': ['email', 'password']
+        },
+        responses={
+            200: {'description': 'Login successful'},
+            400: {'description': 'Invalid credentials or email not verified'}
+        }
+    )
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     def post(self, request, *args, **kwargs):
@@ -302,10 +340,16 @@ class LogoutView(APIView):
     This view handles the logout process for authenticated users.
     It deletes the user's token to ensure they are logged out.
     """
-
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="User logout",
+        description="Logout the authenticated user by deleting their token.",
+        responses={
+            200: {'description': 'Successfully logged out'},
+            400: {'description': 'Invalid token or already logged out'}
+        }
+    )
     def post(self, request):
         """
         Handle POST requests for user logout.
@@ -333,10 +377,23 @@ class ForgotPasswordRequestOTPView(APIView):
     This view handles the process of generating a password reset token
     and sending a reset link to the user's registered email address.
     Rate limiting is applied to restrict the number of requests from the same IP address.
-
-    data : {'email': .email}
     """
 
+    @extend_schema(
+        summary="Request password reset",
+        description="Request a password reset OTP to be sent to user's email.",
+        request={
+            'type': 'object',
+            'properties': {
+                'email': {'type': 'string', 'format': 'email'}
+            },
+            'required': ['email']
+        },
+        responses={
+            200: {'description': 'Password reset link sent to email'},
+            400: {'description': 'Email not found'}
+        }
+    )
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     def post(self, request, *args, **kwargs):
@@ -386,15 +443,26 @@ class ResetPasswordView(APIView):
     user ID, and updates the password if the token is valid.
     Rate limiting is applied to restrict the number of requests
     from the same IP address.
-
-    data : {
-            'uid': self.uid,
-            'token': self.token,
-            'new_password': 'newpassword123',
-            'confirm_password': 'newpassword123'
-        }
     """
 
+    @extend_schema(
+        summary="Reset password",
+        description="Reset user password using token from email.",
+        request={
+            'type': 'object',
+            'properties': {
+                'uid': {'type': 'string'},
+                'token': {'type': 'string'},
+                'new_password': {'type': 'string'},
+                'confirm_password': {'type': 'string'}
+            },
+            'required': ['uid', 'token', 'new_password', 'confirm_password']
+        },
+        responses={
+            200: {'description': 'Password reset successful'},
+            400: {'description': 'Invalid token or passwords do not match'}
+        }
+    )
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     def post(self, request, *args, **kwargs):
@@ -445,18 +513,19 @@ class UpdateKYCView(APIView):
     If no KYC record exists for the user, a new one is created.
     The view utilizes token-based authentication to ensure that only
     authenticated users can access this endpoint.
-
-    data : {
-            "bvn": "98765432101",
-            "nin": "98765432101",
-            "driver_license": mock_image,
-            "verified": False
-        }
     """
 
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Update KYC",
+        description="Update user KYC information including BVN, NIN, and driver license image.",
+        request=KYCSerializer,
+        responses={
+            200: {'description': 'KYC updated successfully'},
+            400: {'description': 'Validation error'}
+        }
+    )
     def post(self, request, *args, **kwargs):
         """
         Handle POST requests for updating KYC information.
@@ -530,22 +599,19 @@ class UpdateVehicleInfoView(APIView):
 
     This view allows authenticated users to update their vehicle details.
     If no vehicle record exists for the user, a new one is created.
-
-    data : {
-            "vehicle_plate_number": "XYZ987ABC",
-            "vehicle_type": "Truck",
-            "vehicle_brand": "Ford",
-            "vehicle_color": "Blue",
-            "vehicle_photo": mock_image,
-            "driver_license": mock_image,
-            "vehicle_inspector_report": mock_image,
-            "vehicle_insurance": mock_image
-        }
     """
 
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Update vehicle info",
+        description="Update user vehicle information including plate number, type, brand, color, and images.",
+        request=VehicleSerializer,
+        responses={
+            200: {'description': 'Vehicle information updated successfully'},
+            400: {'description': 'Validation error'}
+        }
+    )
     def post(self, request, *args, **kwargs):
         """
         Handle POST requests for updating vehicle information.
@@ -633,8 +699,22 @@ class ProfileImageUploadView(APIView):
     """
 
     authentication_classes = [TokenAuthentication]
-    parser_classes = [MultiPartParser, FormParser]  # To handle file uploads
+    parser_classes = [MultiPartParser, FormParser]
 
+    @extend_schema(
+        summary="Upload profile picture",
+        description="Upload user profile picture (image file, max 5MB).",
+        request={
+            'type': 'multipart/form-data',
+            'properties': {
+                'profile_picture': {'type': 'string', 'format': 'binary'}
+            }
+        },
+        responses={
+            200: {'description': 'Profile picture uploaded successfully'},
+            400: {'description': 'Invalid file type or size'}
+        }
+    )
     def post(self, request, *args, **kwargs):
         """
         Handle POST requests for profile image upload.
@@ -688,21 +768,32 @@ class UpdatePersonalInfoView(APIView):
     """
     API view for updating a user's personal information and social media links.
     This view handles proper error responses for invalid inputs and constraints.
-
-    data : {
-            'first_name': 'John',
-            'last_name': 'Doe',
-            'phone_number': '0987654321',
-            'facebook': 'https://facebook.com/newuser',
-            'instagram': 'https://instagram.com/newuser',
-            'linkedin': 'https://linkedin.com/in/newuser',
-        }
     """
 
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]  # To handle file uploads
+    parser_classes = [MultiPartParser, FormParser]
 
+    @extend_schema(
+        summary="Update personal info",
+        description="Update user personal information and social media links.",
+        request={
+            'type': 'multipart/form-data',
+            'properties': {
+                'first_name': {'type': 'string'},
+                'last_name': {'type': 'string'},
+                'phone_number': {'type': 'string'},
+                'facebook': {'type': 'string', 'format': 'uri'},
+                'instagram': {'type': 'string', 'format': 'uri'},
+                'linkedin': {'type': 'string', 'format': 'uri'},
+                'profile_picture': {'type': 'string', 'format': 'binary'}
+            }
+        },
+        responses={
+            200: {'description': 'User information updated successfully'},
+            400: {'description': 'Validation error'},
+            500: {'description': 'Server error'}
+        }
+    )
     def post(self, request, *args, **kwargs):
         """
         Handle POST requests for updating personal information and social media links.
@@ -786,13 +877,26 @@ class UpdateSubscriptionPlanView(APIView):
     This view allows authenticated users to update their subscription plan
     based on the provided plan name. The view utilizes token-based
     authentication to ensure that only authenticated users can access this endpoint.
-
-    data : {'plan_name': 'premium'}
     """
 
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Update subscription plan",
+        description="Update user's subscription plan by plan name.",
+        request={
+            'type': 'object',
+            'properties': {
+                'plan_name': {'type': 'string', 'description': 'Plan name (e.g., free, premium)'}
+            },
+            'required': ['plan_name']
+        },
+        responses={
+            200: {'description': 'Subscription plan updated successfully'},
+            400: {'description': 'Invalid plan name'},
+            404: {'description': 'Plan not found'}
+        }
+    )
     def put(self, request, *args, **kwargs):
         """
         Handle PUT requests for updating the subscription plan.
@@ -837,23 +941,19 @@ class CreateRouteView(APIView):
     the necessary details such as location, destination, transportation mode,
     and departure time. The view utilizes token-based authentication to ensure
     that only authenticated users can access this endpoint.
-
-    data : {
-            "location": "Location A",
-            "location_latitude": 40.712776,
-            "location_longitude": -74.005974,
-            "destination": "Location B",
-            "destination_latitude": 34.052235,
-            "destination_longitude": -118.243683,
-            "transportation_mode": "car",
-            "departure_time": timezone.now().isoformat(),
-            "service_type": "ride",
-        }
     """
 
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Create route",
+        description="Create a new route with location, destination, transportation mode, and departure time.",
+        request=RouteSerializer,
+        responses={
+            201: {'description': 'Route created successfully'},
+            400: {'description': 'Validation error'}
+        }
+    )
     def post(self, request):
         """
         Handle POST requests for creating a new route.
@@ -917,26 +1017,19 @@ class CreateScheduledRouteView(APIView):
     necessary details such as location, destination, transportation mode, and schedule
     information. The view utilizes token-based authentication to ensure that only
     authenticated users can access this endpoint.
-
-    data : {
-            "location": "Location A",
-            "location_latitude": 40.712776,
-            "location_longitude": -74.005974,
-            "destination": "Location B",
-            "destination_latitude": 34.052235,
-            "destination_longitude": -118.243683,
-            "transportation_mode": "car",
-            "departure_time": timezone.now().isoformat(),
-            "is_returning": "True",
-            "returning_time": timezone.now().isoformat(),
-            "is_repeated": "True",
-            "days_of_week": [self.monday.id, self.tuesday.id],
-        }
     """
 
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Create scheduled route",
+        description="Create a scheduled route with recurring schedule options.",
+        request=ScheduledRouteSerializer,
+        responses={
+            201: {'description': 'Scheduled Route created successfully'},
+            400: {'description': 'Validation error'}
+        }
+    )
     def post(self, request):
         """
         Handle POST requests for creating a scheduled route.
@@ -1029,8 +1122,12 @@ class UserRoutesView(APIView):
     """
 
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Get user routes",
+        description="Retrieve all routes for the authenticated user.",
+        responses={200: RouteSerializer(many=True)}
+    )
     def get(self, request):
         """
         Handle GET requests to retrieve the user's routes.
@@ -1050,8 +1147,16 @@ class UserRoutesView(APIView):
 
 class ToggleIsLiveRouteView(APIView):
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Toggle route live status",
+        description="Toggle the is_live status of a specific route.",
+        request=None,
+        responses={
+            200: {'description': 'Route is_live field updated'},
+            404: {'description': 'Route not found'}
+        }
+    )
     def post(self, request, route_id):
         """
         Toggle the 'is_live' status of a user's route.
@@ -1085,25 +1190,19 @@ class ToggleIsLiveRouteView(APIView):
 
 class PackageSubmissionView(APIView):
     """
-    data : {
-            "location": "Origin City",
-            "location_latitude": Decimal("40.712776"),
-            "location_longitude": Decimal("-74.005974"),
-            "destination": "Destination City",
-            "destination_latitude": Decimal("34.052235"),
-            "destination_longitude": Decimal("-118.243683"),
-            "package_type": "Delivery",
-            "item_image": item_image,
-            "item_description": "Books and gadgets",
-            "item_weight": "medium",
-            "receiver_name": "John Doe",
-            "receiver_phone_number": "1234567890",
-            "range_radius": Decimal("10.00"),
-        }
+    API view for submitting a package for delivery.
     """
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Submit package",
+        description="Submit a package for delivery with location, destination, and package details.",
+        request=PackageSerializer,
+        responses={
+            201: {'description': 'Package submitted successfully'},
+            400: {'description': 'Validation error'}
+        }
+    )
     def post(self, request):
         """
         Handle POST requests to submit a package.
@@ -1126,14 +1225,26 @@ class PackageSubmissionView(APIView):
 
 class PlaceBidView(APIView):
     """
-    data : {
-            "price": Decimal("10.00")
-        }
+    API view for placing a bid on a package.
     """
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
-
+    @extend_schema(
+        summary="Place bid",
+        description="Place a bid on a package with a price offer.",
+        request={
+            'type': 'object',
+            'properties': {
+                'price': {'type': 'number', 'description': 'Bid price amount'}
+            },
+            'required': ['price']
+        },
+        responses={
+            201: {'description': 'Bid placed successfully'},
+            400: {'description': 'Price is required'},
+            404: {'description': 'Package not found'}
+        }
+    )
     def post(self, request, package_id):
         """
         Handle POST requests to place a bid on a package.
@@ -1180,8 +1291,16 @@ class PlaceBidView(APIView):
 
 class GetAllBidsView(APIView):
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Get all bids for package",
+        description="Retrieve all bids for a specific package (package owner only).",
+        responses={
+            200: BidSerializer(many=True),
+            403: {'description': 'Not authorized'},
+            404: {'description': 'Package not found'}
+        }
+    )
     def get(self, request, package_id):
         try:
             # Retrieve the package
@@ -1204,8 +1323,16 @@ class GetAllBidsView(APIView):
 
 class GetBidDetailView(APIView):
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Get bid detail",
+        description="Get details of a specific bid (bid owner or package owner).",
+        responses={
+            200: BidSerializer,
+            403: {'description': 'Not authorized'},
+            404: {'description': 'Bid not found'}
+        }
+    )
     def get(self, request, bid_id):
         try:
             user = get_user_from_token(request)
@@ -1226,8 +1353,17 @@ class GetBidDetailView(APIView):
 
 class SelectMoverView(APIView):
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Select mover",
+        description="Select a mover for a package delivery bid.",
+        responses={
+            200: {'description': 'Mover selected successfully'},
+            400: {'description': 'Mover already selected'},
+            403: {'description': 'Not authorized'},
+            404: {'description': 'Bid not found'}
+        }
+    )
     def post(self, request, bid_id):
         try:
             user = get_user_from_token(request)
@@ -1264,8 +1400,12 @@ class SelectMoverView(APIView):
 
 class GetAllPackageOffersView(APIView):
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Get all package offers",
+        description="Retrieve all package offers for the authenticated user.",
+        responses={200: PackageOfferSerializer(many=True)}
+    )
     def get(self, request):
         try:
             user = get_user_from_token(request)
@@ -1282,8 +1422,15 @@ class GetAllPackageOffersView(APIView):
 
 class GetPackageOfferDetailView(APIView):
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Get package offer detail",
+        description="Get details of a specific package offer.",
+        responses={
+            200: PackageOfferSerializer,
+            404: {'description': 'Package offer not found'}
+        }
+    )
     def get(self, request, package_offer_id):
         try:
             # Retrieve the package offer using the package_offer_id
@@ -1299,11 +1446,25 @@ class GetPackageOfferDetailView(APIView):
 
 class PickupConfirmationView(APIView):
     """
-    data : {'code': '12345'}
+    API view for confirming package pickup.
     """
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Confirm pickup",
+        description="Confirm package pickup using QR code.",
+        request={
+            'type': 'object',
+            'properties': {
+                'code': {'type': 'string', 'description': 'QR code'}
+            },
+            'required': ['code']
+        },
+        responses={
+            200: {'description': 'Pickup confirmed'},
+            400: {'description': 'Invalid code'}
+        }
+    )
     def post(self, request, package_offer_id):
         package_offer = PackageOffer.objects.get(id=package_offer_id)
         code = request.data.get('code')
@@ -1319,11 +1480,25 @@ class PickupConfirmationView(APIView):
 
 class DeliveryConfirmationView(APIView):
     """
-    data : {'code': '12345'}
+    API view for confirming package delivery.
     """
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Confirm delivery",
+        description="Confirm package delivery using QR code.",
+        request={
+            'type': 'object',
+            'properties': {
+                'code': {'type': 'string', 'description': 'QR code'}
+            },
+            'required': ['code']
+        },
+        responses={
+            200: {'description': 'Delivery confirmed'},
+            400: {'description': 'Invalid code'}
+        }
+    )
     def post(self, request, package_offer_id):
         package_offer = PackageOffer.objects.get(id=package_offer_id)
         code = request.data.get('code')
@@ -1342,8 +1517,12 @@ class PickedUpPackageOffersView(APIView):
     View to retrieve all package offers that have been picked up for the authenticated user.
     """
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Get picked up offers",
+        description="Retrieve all package offers that have been picked up.",
+        responses={200: PackageOfferSerializer(many=True)}
+    )
     def get(self, request):
         try:
             user = get_user_from_token(request)
@@ -1363,8 +1542,12 @@ class ScheduledPackageOffersView(APIView):
     View to retrieve all scheduled package offers for the authenticated user.
     """
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Get scheduled offers",
+        description="Retrieve all scheduled package offers.",
+        responses={200: PackageOfferSerializer(many=True)}
+    )
     def get(self, request):
         try:
             user = get_user_from_token(request)
@@ -1384,8 +1567,15 @@ class CancelPackageOfferView(APIView):
     View to cancel a package offer for the authenticated user.
     """
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Cancel package offer",
+        description="Cancel a package offer.",
+        responses={
+            200: {'description': 'Package offer cancelled successfully'},
+            404: {'description': 'Package offer not found'}
+        }
+    )
     def post(self, request, pk):
         try:
             user = get_user_from_token(request)
