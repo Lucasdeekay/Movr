@@ -43,7 +43,7 @@ class KYCSerializer(serializers.ModelSerializer):
                 driver_license_file = request.FILES.get('driver_license')
             
             if driver_license_file:
-                from Api.utils import upload_to_cloudinary
+                from core.utils import upload_to_cloudinary
                 driver_license_url = upload_to_cloudinary(driver_license_file)
                 validated_data['driver_license'] = driver_license_url
             else:
@@ -77,7 +77,7 @@ class KYCSerializer(serializers.ModelSerializer):
             old_bvn = instance.bvn
             
             if driver_license_file:
-                from Api.utils import upload_to_cloudinary
+                from core.utils import upload_to_cloudinary
                 driver_license_url = upload_to_cloudinary(driver_license_file)
                 validated_data['driver_license'] = driver_license_url
             elif 'driver_license' in validated_data and validated_data['driver_license'] is None:
@@ -130,7 +130,7 @@ class VehicleSerializer(serializers.ModelSerializer):
                 if request and request.FILES:
                     file = request.FILES.get(field)
                     if file:
-                        from Api.utils import upload_to_cloudinary
+                        from core.utils import upload_to_cloudinary
                         validated_data[field] = upload_to_cloudinary(file)
                     else:
                         validated_data.pop(field, None)
@@ -149,7 +149,7 @@ class VehicleSerializer(serializers.ModelSerializer):
                 if request and request.FILES:
                     file = request.FILES.get(field)
                     if file:
-                        from Api.utils import upload_to_cloudinary
+                        from core.utils import upload_to_cloudinary
                         validated_data[field] = upload_to_cloudinary(file)
                     elif field in validated_data and validated_data[field] is None:
                         pass
