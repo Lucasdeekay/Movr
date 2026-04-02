@@ -23,12 +23,12 @@ urlpatterns = [
     path('profile/v1/', include('Profile.urls')),
     
     # Other apps (keep existing for now, can add versioning later)
-    path('wallet/', include('wallet.urls')),
-    path('routes/', include('Routes.urls')),
-    path('packages/', include('Packages.urls')),
-    path('chat/', include('Chat.urls')),
-    path('presence/', include('Presence.urls')),
-    path('emergency/', include('Emergency.urls')),
+    path('wallet/v1/', include('wallet.urls')),
+    path('routes/v1/', include('Routes.urls')),
+    path('packages/v1/', include('Packages.urls')),
+    path('chat/v1/', include('Chat.urls')),
+    path('presence/v1/', include('Presence.urls')),
+    path('emergency/v1/', include('Emergency.urls')),
     
     # API Schema
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
