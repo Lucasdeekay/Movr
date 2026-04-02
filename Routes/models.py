@@ -1,18 +1,5 @@
 from django.db import models
-import uuid
-
-
-class UUIDModel(models.Model):
-    """
-    Abstract base class that provides primary key field 'id' as a UUID.
-    """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_column='id')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        abstract = True
-        ordering = ('-created_at',)
+from Api.models import UUIDModel
 
 
 class Day(UUIDModel):

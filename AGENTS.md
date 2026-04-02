@@ -48,6 +48,30 @@ python manage.py test Api.tests.test_views.RegisterViewTestCase.test_successful_
 # Single test (pytest)
 pytest Api/tests/test_views.py::RegisterViewTestCase::test_successful_registration
 pytest -k test_successful_registration
+
+# Chat app tests
+python manage.py test Chat.tests
+pytest Chat/tests/ -v
+
+# Presence app tests
+python manage.py test Presence.tests
+pytest Presence/tests/ -v
+
+# Emergency app tests
+python manage.py test Emergency.tests
+pytest Emergency/tests/ -v
+
+# Routes app tests
+python manage.py test Routes.tests
+pytest Routes/tests/ -v
+
+# Packages app tests
+python manage.py test Packages.tests
+pytest Packages/tests/ -v
+
+# Wallet app tests
+python manage.py test wallet.tests
+pytest wallet/tests/ -v
 ```
 
 ### Code Quality
