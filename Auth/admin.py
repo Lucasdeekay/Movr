@@ -17,7 +17,7 @@ class CustomUserAdmin(BaseUserAdmin):
     )
     list_filter = (
         'is_email_verified', 'two_factor_enabled', 'is_staff',
-        'is_superuser', 'is_active', 'date_joined'
+        'is_superuser', 'date_joined'
     )
     search_fields = ('email', 'first_name', 'last_name', 'phone_number')
     ordering = ('-date_joined',)

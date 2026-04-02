@@ -281,12 +281,12 @@ from wallet.services import create_dedicated_account
 
 ### Real-Time Features
 
-| Endpoint | Consumer | Description |
-|----------|----------|-------------|
-| `ws/live-routes/?token=<token>` | TotalLiveRoutesConsumer | Live routes count |
-| `ws/notifications/?token=<token>` | NotificationConsumer | Notifications, trip updates, payments |
-| `ws/chat/?token=<token>` | ChatConsumer | Real-time chat messages |
-| `ws/presence/?token=<token>` | PresenceConsumer | Presence and location updates |
+| Endpoint | Consumer | App | Description |
+|----------|----------|-----|-------------|
+| `ws/live-routes/?token=<token>` | TotalLiveRoutesConsumer | Routes | Live routes count |
+| `ws/notifications/?token=<token>` | NotificationConsumer | Profile | Notifications, trip updates, payments |
+| `ws/chat/?token=<token>` | ChatConsumer | Chat | Real-time chat messages |
+| `ws/presence/?token=<token>` | PresenceConsumer | Presence | Presence and location updates |
 
 ### WebSocket Message Types
 

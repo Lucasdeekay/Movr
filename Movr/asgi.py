@@ -12,12 +12,21 @@ import os
 from channels.auth import AuthMiddlewareStack
 from channels.routing import ProtocolTypeRouter, URLRouter
 from django.core.asgi import get_asgi_application
-from Api.routing import websocket_urlpatterns
 
-import Api
+import Routes.routing
+import Chat.routing
+import Presence.routing
+import Profile.routing
 
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Movr.settings')
+
+websocket_urlpatterns = (
+    Routes.routing.websocket_urlpatterns +
+    Chat.routing.websocket_urlpatterns +
+    Presence.routing.websocket_urlpatterns +
+    Profile.routing.websocket_urlpatterns
+)
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),

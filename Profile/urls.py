@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .models import KYC, Vehicle, SubscriptionPlan, Subscription, Notification, Badge, UserBadge, ReferralToken, Referral, SocialMediaLink
 from .serializers import (
