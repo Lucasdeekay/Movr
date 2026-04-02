@@ -590,3 +590,206 @@ class Notification(UUIDModel):
             int: Number of notifications marked as read
         """
         return cls.objects.filter(user=user, is_read=False).update(is_read=True)
+
+
+class ChatConversation(UUIDModel):
+    """
+    Model representing a chat conversation between users.
+    
+    A conversation can be associated with a trip (PackageOffer) for
+    contextual chat during delivery, or be standalone for general messaging.
+    """
+    participants = models.ManyToManyField(
+        CustomUser, 
+        related_name='conversations',
+        help_text='Users participating in this conversation'
+    )
+    trip = models.ForeignKey(
+        'PackageOffer', 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True,
+        related_name='chat_conversations',
+        help_text='Associated trip/delivery (optional)'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Whether conversation is active'
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Chat Conversation"
+        verbose_name_plural = "Chat Conversations"
+
+    def __str__(self):
+        participant_names = ", ".join([u.email for u in self.participants.all()[:3]])
+        return f"Conversation: {participant_names}"
+
+
+class ChatMessage(UUIDModel):
+    """
+    Model representing a message in a chat conversation.
+    
+    Stores individual messages with sender info, read status,
+    and timestamps.
+    """
+    conversation = models.ForeignKey(
+        ChatConversation, 
+        on_delete=models.CASCADE, 
+        related_name='messages',
+        help_text='Conversation this message belongs to'
+    )
+    sender = models.ForeignKey(
+        CustomUser, 
+        on_delete=models.CASCADE, 
+        related_name='sent_messages',
+        help_text='User who sent the message'
+    )
+    message = models.TextField(
+        help_text='Message content'
+    )
+    is_read = models.BooleanField(
+        default=False,
+        help_text='Whether message has been read'
+    )
+    read_at = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text='When message was read'
+    )
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = "Chat Message"
+        verbose_name_plural = "Chat Messages"
+
+    def __str__(self):
+        return f"Message from {self.sender.email}: {self.message[:30]}..."
+
+
+class UserPresence(UUIDModel):
+    """
+    Model representing user online/offline presence status.
+    
+    Tracks user presence for real-time features like showing
+    online drivers or delivery personnel.
+    """
+    user = models.OneToOneField(
+        CustomUser, 
+        on_delete=models.CASCADE, 
+        related_name='presence',
+        help_text='User presence record'
+    )
+    is_online = models.BooleanField(
+        default=False,
+        help_text='Whether user is currently online'
+    )
+    last_seen = models.DateTimeField(
+        auto_now=True,
+        help_text='Last time user was seen online'
+    )
+    current_latitude = models.DecimalField(
+        max_digits=9, 
+        decimal_places=6, 
+        null=True, 
+        blank=True,
+        help_text='Current latitude location'
+    )
+    current_longitude = models.DecimalField(
+        max_digits=9, 
+        decimal_places=6, 
+        null=True, 
+        blank=True,
+        help_text='Current longitude location'
+    )
+    location_updated_at = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text='Last time location was updated'
+    )
+
+    class Meta:
+        ordering = ['-last_seen']
+        verbose_name = "User Presence"
+        verbose_name_plural = "User Presences"
+
+    def __str__(self):
+        status = "online" if self.is_online else "offline"
+        return f"{self.user.email} - {status}"
+
+
+class EmergencySOS(UUIDModel):
+    """
+    Model representing an emergency SOS alert.
+    
+    Users can trigger SOS alerts during trips for immediate
+    assistance. Admin can monitor and respond to alerts.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('acknowledged', 'Acknowledged'),
+        ('resolved', 'Resolved'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    user = models.ForeignKey(
+        CustomUser, 
+        on_delete=models.CASCADE, 
+        related_name='sos_alerts',
+        help_text='User who triggered the SOS'
+    )
+    trip = models.ForeignKey(
+        'PackageOffer', 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True,
+        related_name='sos_alerts',
+        help_text='Trip during which SOS was triggered'
+    )
+    latitude = models.DecimalField(
+        max_digits=9, 
+        decimal_places=6, 
+        null=True, 
+        blank=True,
+        help_text='Location latitude where SOS was triggered'
+    )
+    longitude = models.DecimalField(
+        max_digits=9, 
+        decimal_places=6, 
+        null=True, 
+        blank=True,
+        help_text='Location longitude where SOS was triggered'
+    )
+    message = models.TextField(
+        null=True, 
+        blank=True,
+        help_text='Optional message from user'
+    )
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default='pending',
+        help_text='Current status of the SOS alert'
+    )
+    acknowledged_by = models.ForeignKey(
+        CustomUser, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='acknowledged_sos',
+        help_text='Admin who acknowledged the SOS'
+    )
+    resolved_at = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text='When the SOS was resolved'
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Emergency SOS"
+        verbose_name_plural = "Emergency SOS Alerts"
+
+    def __str__(self):
+        return f"SOS from {self.user.email} - {self.status}"

@@ -46,6 +46,11 @@ INSTALLED_APPS = [
     'channels',
     'Api',
     'wallet',
+    'Routes',
+    'Packages',
+    'Chat',
+    'Presence',
+    'Emergency',
 ]
 
 MIDDLEWARE = [
@@ -232,7 +237,7 @@ MONNIFY_MAIN_ACCOUNT_NUMBER= config("MONNIFY_MAIN_ACCOUNT_NUMBER")
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Movr API',
-    'DESCRIPTION': 'Backend API documentation for Movr platform',
+    'DESCRIPTION': 'Backend API documentation for Movr platform - Transportation and Logistics Platform',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 
@@ -245,6 +250,40 @@ SPECTACULAR_SETTINGS = {
         'name': 'MIT',
     },
 
-    # Optional but recommended
     'COMPONENT_SPLIT_REQUEST': True,
+
+    'TAGS': [
+        {'name': 'Authentication', 'description': 'User authentication and registration endpoints'},
+        {'name': 'User Profile', 'description': 'User profile and KYC management'},
+        {'name': 'Routes', 'description': 'Route creation and management'},
+        {'name': 'Packages', 'description': 'Package delivery and bidding'},
+        {'name': 'Chat', 'description': 'Real-time chat messaging'},
+        {'name': 'Presence', 'description': 'Online/offline status and location tracking'},
+        {'name': 'Emergency', 'description': 'Emergency SOS alerts'},
+        {'name': 'Wallet', 'description': 'Wallet and payment management'},
+        {'name': 'Real-Time', 'description': 'WebSocket and real-time features'},
+    ],
+
+    'ENABLE_WEBHOOKS': True,
+    
+    'WEBHOOKS': [
+        {
+            'path': '/wallet/api/webhook/monnify/',
+            'method': 'POST',
+            'description': 'Webhook endpoint for Monnify payment notifications. Receives payment confirmations, withdrawal status updates, and account events.',
+            'request': {
+                'example': {
+                    'eventType': 'TRANSACTION_COMPLETED',
+                    'eventTimestamp': '2024-01-15T10:30:00.000Z',
+                    'reference': 'MNFY-REF-123',
+                    'amount': 5000.00,
+                }
+            },
+            'response': {
+                'example': {
+                    'status': 'success'
+                }
+            }
+        },
+    ],
 }

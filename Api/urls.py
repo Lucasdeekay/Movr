@@ -16,6 +16,9 @@ from .views import (
     PlaceBidView, PickupConfirmationView, DeliveryConfirmationView, SelectMoverView, GetAllBidsView, GetBidDetailView,
     GetPackageOfferDetailView, ResendOTPView, PickedUpPackageOffersView, GetAllPackageOffersView,
     ScheduledPackageOffersView, CancelPackageOfferView,
+    SendChatMessageView, GetConversationMessagesView, GetUserConversationsView,
+    UpdatePresenceView, GetOnlineUsersView, UpdateLocationView, GetNearbyUsersView,
+    TriggerSOSView, GetSOSAlertsView,
     )
 
 # Initialize the router
@@ -67,5 +70,21 @@ urlpatterns = [
     path('offers/picked-up/', PickedUpPackageOffersView.as_view(), name='picked-up-package-offers'),
     path('offers/scheduled/', ScheduledPackageOffersView.as_view(), name='scheduled-package-offers'),
     path('offers/<uuid:pk>/cancel/', CancelPackageOfferView.as_view(), name='cancel-package-offer'),
+    
+    # Real-Time Chat endpoints
+    path('chat/send/', SendChatMessageView.as_view(), name='send-chat-message'),
+    path('chat/<uuid:conversation_id>/', GetConversationMessagesView.as_view(), name='get-conversation-messages'),
+    path('chat/conversations/', GetUserConversationsView.as_view(), name='get-user-conversations'),
+    
+    # Presence and Location endpoints
+    path('presence/update/', UpdatePresenceView.as_view(), name='update-presence'),
+    path('presence/online/', GetOnlineUsersView.as_view(), name='get-online-users'),
+    path('location/update/', UpdateLocationView.as_view(), name='update-location'),
+    path('location/nearby/', GetNearbyUsersView.as_view(), name='get-nearby-users'),
+    
+    # Emergency SOS endpoints
+    path('sos/trigger/', TriggerSOSView.as_view(), name='trigger-sos'),
+    path('sos/alerts/', GetSOSAlertsView.as_view(), name='get-sos-alerts'),
+    
     path('api/', include(router.urls)),
 ]

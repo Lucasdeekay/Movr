@@ -7,7 +7,7 @@ from wallet.services import update_bvn_on_reserved_account
 
 from .models import CustomUser, KYC, Notification, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
     Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, \
-    Badge, UserBadge, ReferralToken, Referral
+    Badge, UserBadge, ReferralToken, Referral, ChatConversation, ChatMessage, UserPresence, EmergencySOS
 
 import logging
 
@@ -409,3 +409,74 @@ class NotificationDetailSerializer(serializers.ModelSerializer):
         Returns the user's full name or email if name is not available.
         """
         return obj.user.get_full_name() if obj.user else None
+
+
+class ChatConversationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ChatConversation model.
+    
+    Handles serialization of chat conversations including
+    participant details and trip association.
+    """
+    participant_emails = serializers.SerializerMethodField()
+    trip_id = serializers.UUIDField(source='trip.id', read_only=True)
+    
+    class Meta:
+        model = ChatConversation
+        fields = ('id', 'participants', 'participant_emails', 'trip', 'trip_id', 'is_active', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+    
+    def get_participant_emails(self, obj):
+        return [u.email for u in obj.participants.all()]
+
+
+class ChatMessageSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ChatMessage model.
+    
+    Handles serialization of chat messages including
+    sender details and read status.
+    """
+    sender_email = serializers.ReadOnlyField(source='sender.email')
+    
+    class Meta:
+        model = ChatMessage
+        fields = ('id', 'conversation', 'sender', 'sender_email', 'message', 'is_read', 'read_at', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
+class UserPresenceSerializer(serializers.ModelSerializer):
+    """
+    Serializer for UserPresence model.
+    
+    Handles serialization of user presence status including
+    online/offline status and location.
+    """
+    user_email = serializers.ReadOnlyField(source='user.email')
+    
+    class Meta:
+        model = UserPresence
+        fields = ('id', 'user', 'user_email', 'is_online', 'last_seen', 'current_latitude', 'current_longitude', 'location_updated_at')
+        read_only_fields = ('id', 'last_seen', 'location_updated_at')
+
+
+class EmergencySOSSerializer(serializers.ModelSerializer):
+    """
+    Serializer for EmergencySOS model.
+    
+    Handles serialization of emergency SOS alerts including
+    user details, location, and status.
+    """
+    user_email = serializers.ReadOnlyField(source='user.email')
+    acknowledged_by_email = serializers.ReadOnlyField(source='acknowledged_by.email')
+    trip_id = serializers.UUIDField(source='trip.id', read_only=True)
+    
+    class Meta:
+        model = EmergencySOS
+        fields = (
+            'id', 'user', 'user_email', 'trip', 'trip_id', 
+            'latitude', 'longitude', 'message', 'status', 
+            'acknowledged_by', 'acknowledged_by_email', 
+            'resolved_at', 'created_at'
+        )
+        read_only_fields = ('id', 'created_at', 'resolved_at')

@@ -27,6 +27,11 @@ urlpatterns = [
     path('manager/', admin.site.urls),
     path('', include('Api.urls')),
     path('wallet/', include('wallet.urls')),
+    path('routes/', include('Routes.urls')),
+    path('packages/', include('Packages.urls')),
+    path('chat/', include('Chat.urls')),
+    path('presence/', include('Presence.urls')),
+    path('emergency/', include('Emergency.urls')),
     # Schema
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     # Swagger UI

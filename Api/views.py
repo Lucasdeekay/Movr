@@ -22,14 +22,17 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import TokenAuthentication
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 
 from wallet.models import Transaction, Wallet
 from wallet.services import create_dedicated_account_for_user
 from .models import Route, ScheduledRoute, Day, Package, Bid, PackageOffer, QRCode
 from .models import CustomUser, KYC, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink
+from .models import ChatConversation, ChatMessage, UserPresence, EmergencySOS
 from .serializers import CustomUserSerializer, OTPVerificationSerializer, TokenSerializer, VehicleSerializer, \
     KYCSerializer, SocialMediaLinkSerializer, RouteSerializer, ScheduledRouteSerializer, PackageSerializer, \
-    BidSerializer, PackageOfferSerializer
+    BidSerializer, PackageOfferSerializer, ChatConversationSerializer, ChatMessageSerializer, \
+    UserPresenceSerializer, EmergencySOSSerializer
 from rest_framework.authtoken.models import Token
 import random
 
@@ -90,15 +93,28 @@ class RegisterView(APIView):
     creates a new user, initializes associated KYC, Vehicle, and Subscription objects,
     and sends an OTP for email verification. Rate limiting is applied to restrict
     the number of registration attempts from the same IP address.
-
-    data : {
-            "email": "newuser@example.com",
-            "password": "password123",
-        }
     """
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=CustomUserSerializer,
+        responses={200: CustomUserSerializer, 400: dict, 500: dict},
+        tags=['Authentication'],
+        examples=[
+            OpenApiExample(
+                'Registration Example',
+                value={'email': 'newuser@example.com', 'password': 'password123'},
+                request_only=True,
+            ),
+            OpenApiExample(
+                'Success Response',
+                value={'id': 'uuid', 'email': 'newuser@example.com', 'is_email_verified': False},
+                response_only=True,
+                status_codes=['200'],
+            ),
+        ],
+    )
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True), name='post')
     def post(self, request, *args, **kwargs):
@@ -151,16 +167,22 @@ class VerifyOTPView(APIView):
     This view handles the verification of an OTP sent to a user's email.
     It checks if the provided OTP is valid, not used, and not expired.
     If the OTP is valid, it marks it as used and updates the user's email verification status.
-    Rate limiting is applied to restrict the number of verification attempts from the same IP address.
-
-    data : {
-            "email": email,
-            "code": code,
-        }
     """
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=OTPVerificationSerializer,
+        responses={200: dict, 400: dict},
+        tags=['Authentication'],
+        examples=[
+            OpenApiExample(
+                'Verify OTP Example',
+                value={'email': 'user@example.com', 'code': '1234'},
+                request_only=True,
+            ),
+        ],
+    )
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     def post(self, request, *args, **kwargs):
@@ -248,17 +270,29 @@ class LoginView(APIView):
 
     This view handles user authentication by verifying the provided email and password.
     If the credentials are valid and the user's email is verified, a token is generated
-    for the user, and their information is returned in the response. Rate limiting is applied
-    to restrict the number of login attempts from the same IP address.
-
-    data : {
-            'email': email,
-            'password': 'password123'
-        }
+    for the user, and their information is returned in the response.
     """
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=TokenSerializer,
+        responses={200: dict, 400: dict},
+        tags=['Authentication'],
+        examples=[
+            OpenApiExample(
+                'Login Example',
+                value={'email': 'user@example.com', 'password': 'password123'},
+                request_only=True,
+            ),
+            OpenApiExample(
+                'Login Success',
+                value={'token': 'token_key', 'user': {'id': 'uuid', 'email': 'user@example.com'}},
+                response_only=True,
+                status_codes=['200'],
+            ),
+        ],
+    )
     @csrf_exempt
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     def post(self, request, *args, **kwargs):
@@ -302,10 +336,13 @@ class LogoutView(APIView):
     This view handles the logout process for authenticated users.
     It deletes the user's token to ensure they are logged out.
     """
-
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        responses={200: dict},
+        tags=['Authentication'],
+    )
     def post(self, request):
         """
         Handle POST requests for user logout.
@@ -443,20 +480,15 @@ class UpdateKYCView(APIView):
 
     This view allows authenticated users to update their KYC details.
     If no KYC record exists for the user, a new one is created.
-    The view utilizes token-based authentication to ensure that only
-    authenticated users can access this endpoint.
-
-    data : {
-            "bvn": "98765432101",
-            "nin": "98765432101",
-            "driver_license": mock_image,
-            "verified": False
-        }
     """
-
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=KYCSerializer,
+        responses={200: KYCSerializer, 400: dict},
+        tags=['User Profile'],
+    )
     def post(self, request, *args, **kwargs):
         """
         Handle POST requests for updating KYC information.
@@ -835,25 +867,16 @@ class CreateRouteView(APIView):
 
     This view allows authenticated users to create a new route by providing
     the necessary details such as location, destination, transportation mode,
-    and departure time. The view utilizes token-based authentication to ensure
-    that only authenticated users can access this endpoint.
-
-    data : {
-            "location": "Location A",
-            "location_latitude": 40.712776,
-            "location_longitude": -74.005974,
-            "destination": "Location B",
-            "destination_latitude": 34.052235,
-            "destination_longitude": -118.243683,
-            "transportation_mode": "car",
-            "departure_time": timezone.now().isoformat(),
-            "service_type": "ride",
-        }
+    and departure time.
     """
-
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=RouteSerializer,
+        responses={200: RouteSerializer, 400: dict},
+        tags=['Routes'],
+    )
     def post(self, request):
         """
         Handle POST requests for creating a new route.
@@ -1085,25 +1108,19 @@ class ToggleIsLiveRouteView(APIView):
 
 class PackageSubmissionView(APIView):
     """
-    data : {
-            "location": "Origin City",
-            "location_latitude": Decimal("40.712776"),
-            "location_longitude": Decimal("-74.005974"),
-            "destination": "Destination City",
-            "destination_latitude": Decimal("34.052235"),
-            "destination_longitude": Decimal("-118.243683"),
-            "package_type": "Delivery",
-            "item_image": item_image,
-            "item_description": "Books and gadgets",
-            "item_weight": "medium",
-            "receiver_name": "John Doe",
-            "receiver_phone_number": "1234567890",
-            "range_radius": Decimal("10.00"),
-        }
+    API view for submitting a package for delivery.
+
+    This view allows authenticated users to create a package delivery request
+    with details like location, destination, package type, and receiver information.
     """
     authentication_classes = [TokenAuthentication]
-#     permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=PackageSerializer,
+        responses={201: PackageSerializer, 400: dict},
+        tags=['Packages'],
+    )
     def post(self, request):
         """
         Handle POST requests to submit a package.
@@ -1400,4 +1417,308 @@ class CancelPackageOfferView(APIView):
             return Response({"error": "Package offer not found."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SendChatMessageView(APIView):
+    """
+    API view for sending a chat message.
+    
+    Allows authenticated users to send messages in a conversation.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=ChatMessageSerializer,
+        responses={201: ChatMessageSerializer, 400: dict},
+        tags=['Real-Time'],
+    )
+    def post(self, request):
+        user = get_user_from_token(request)
+        serializer = ChatMessageSerializer(data=request.data)
+        if serializer.is_valid():
+            conversation = serializer.validated_data['conversation']
+            if user not in conversation.participants.all():
+                return Response({"error": "You are not a participant in this conversation"}, status=status.HTTP_403_FORBIDDEN)
+            
+            message = serializer.save(sender=user)
+            
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            channel_layer = get_channel_layer()
+            
+            for participant in conversation.participants.all():
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{participant.id}",
+                    {
+                        "type": "chat_message",
+                        "message": {
+                            "id": str(message.id),
+                            "sender": user.email,
+                            "message": message.message,
+                            "conversation_id": str(conversation.id),
+                            "created_at": message.created_at.isoformat(),
+                        }
+                    }
+                )
+            
+            return Response(ChatMessageSerializer(message).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GetConversationMessagesView(APIView):
+    """
+    API view for getting messages in a conversation.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={200: ChatMessageSerializer(many=True), 400: dict},
+        tags=['Real-Time'],
+    )
+    def get(self, request, conversation_id):
+        user = get_user_from_token(request)
+        try:
+            conversation = ChatConversation.objects.get(id=conversation_id)
+        except ChatConversation.DoesNotExist:
+            return Response({"error": "Conversation not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        if user not in conversation.participants.all():
+            return Response({"error": "You are not a participant in this conversation"}, status=status.HTTP_403_FORBIDDEN)
+        
+        messages = conversation.messages.all()
+        serializer = ChatMessageSerializer(messages, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class GetUserConversationsView(APIView):
+    """
+    API view for getting all conversations for a user.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={200: ChatConversationSerializer(many=True)},
+        tags=['Real-Time'],
+    )
+    def get(self, request):
+        user = get_user_from_token(request)
+        conversations = ChatConversation.objects.filter(participants=user, is_active=True)
+        serializer = ChatConversationSerializer(conversations, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UpdatePresenceView(APIView):
+    """
+    API view for updating user presence (online/offline).
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=UserPresenceSerializer,
+        responses={200: UserPresenceSerializer, 400: dict},
+        tags=['Real-Time'],
+    )
+    def post(self, request):
+        user = get_user_from_token(request)
+        presence, _ = UserPresence.objects.get_or_create(user=user)
+        
+        is_online = request.data.get('is_online', True)
+        latitude = request.data.get('latitude')
+        longitude = request.data.get('longitude')
+        
+        presence.is_online = is_online
+        if latitude:
+            presence.current_latitude = latitude
+        if longitude:
+            presence.current_longitude = longitude
+        if latitude and longitude:
+            presence.location_updated_at = timezone.now()
+        presence.save()
+        
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        
+        async_to_sync(channel_layer.group_send)(
+            "presence_updates",
+            {
+                "type": "presence_update",
+                "user_id": str(user.id),
+                "email": user.email,
+                "is_online": presence.is_online,
+                "latitude": str(presence.current_latitude) if presence.current_latitude else None,
+                "longitude": str(presence.current_longitude) if presence.current_longitude else None,
+            }
+        )
+        
+        return Response(UserPresenceSerializer(presence).data, status=status.HTTP_200_OK)
+
+
+class GetOnlineUsersView(APIView):
+    """
+    API view for getting all online users.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={200: UserPresenceSerializer(many=True)},
+        tags=['Real-Time'],
+    )
+    def get(self, request):
+        get_user_from_token(request)
+        online_users = UserPresence.objects.filter(is_online=True)
+        serializer = UserPresenceSerializer(online_users, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UpdateLocationView(APIView):
+    """
+    API view for updating user location.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=dict,
+        responses={200: dict, 400: dict},
+        tags=['Real-Time'],
+    )
+    def post(self, request):
+        user = get_user_from_token(request)
+        latitude = request.data.get('latitude')
+        longitude = request.data.get('longitude')
+        
+        if not latitude or not longitude:
+            return Response({"error": "Latitude and longitude are required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        presence, _ = UserPresence.objects.get_or_create(user=user)
+        presence.current_latitude = latitude
+        presence.current_longitude = longitude
+        presence.location_updated_at = timezone.now()
+        presence.is_online = True
+        presence.last_seen = timezone.now()
+        presence.save()
+        
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        
+        async_to_sync(channel_layer.group_send)(
+            f"user_{user.id}",
+            {
+                "type": "location_update",
+                "user_id": str(user.id),
+                "latitude": str(latitude),
+                "longitude": str(longitude),
+            }
+        )
+        
+        return Response({"message": "Location updated", "latitude": latitude, "longitude": longitude}, status=status.HTTP_200_OK)
+
+
+class TriggerSOSView(APIView):
+    """
+    API view for triggering an emergency SOS alert.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=EmergencySOSSerializer,
+        responses={201: EmergencySOSSerializer, 400: dict},
+        tags=['Real-Time'],
+    )
+    def post(self, request):
+        user = get_user_from_token(request)
+        serializer = EmergencySOSSerializer(data=request.data)
+        if serializer.is_valid():
+            sos = serializer.save(user=user)
+            
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            channel_layer = get_channel_layer()
+            
+            async_to_sync(channel_layer.group_send)(
+                "admin_alerts",
+                {
+                    "type": "sos_alert",
+                    "alert": {
+                        "id": str(sos.id),
+                        "user_email": user.email,
+                        "latitude": str(sos.latitude) if sos.latitude else None,
+                        "longitude": str(sos.longitude) if sos.longitude else None,
+                        "message": sos.message,
+                        "created_at": sos.created_at.isoformat(),
+                    }
+                }
+            )
+            
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GetSOSAlertsView(APIView):
+    """
+    API view for getting SOS alerts (admin only or user's own).
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={200: EmergencySOSSerializer(many=True)},
+        tags=['Real-Time'],
+    )
+    def get(self, request):
+        user = get_user_from_token(request)
+        status_filter = request.query_params.get('status')
+        
+        if status_filter:
+            alerts = EmergencySOS.objects.filter(user=user, status=status_filter)
+        else:
+            alerts = EmergencySOS.objects.filter(user=user)
+        
+        serializer = EmergencySOSSerializer(alerts, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class GetNearbyUsersView(APIView):
+    """
+    API view for getting nearby users based on location and radius.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={200: UserPresenceSerializer(many=True)},
+        tags=['Real-Time'],
+    )
+    def get(self, request):
+        user = get_user_from_token(request)
+        lat = request.query_params.get('latitude')
+        lng = request.query_params.get('longitude')
+        radius = request.query_params.get('radius', 10)
+        
+        if not lat or not lng:
+            return Response({"error": "latitude, longitude, and radius are required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        from decimal import Decimal
+        lat = Decimal(lat)
+        lng = Decimal(lng)
+        radius = Decimal(radius)
+        
+        nearby_users = UserPresence.objects.filter(
+            is_online=True,
+            current_latitude__gte=lat - radius,
+            current_latitude__lte=lat + radius,
+            current_longitude__gte=lng - radius,
+            current_longitude__lte=lng + radius,
+        ).exclude(user=user)
+        
+        serializer = UserPresenceSerializer(nearby_users, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
