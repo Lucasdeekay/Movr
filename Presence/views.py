@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from drf_spectacular.utils import extend_schema
 
-from Api.views import get_user_from_token
+from Auth.views import get_user_from_token
 from .models import UserPresence
 from .serializers import UserPresenceSerializer
 from django.utils import timezone

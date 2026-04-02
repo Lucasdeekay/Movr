@@ -1,5 +1,17 @@
 from django.db import models
-from Api.models import UUIDModel
+import uuid
+
+
+class UUIDModel(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_column='id')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+        ordering = ('-created_at',)
+        verbose_name = 'UUID Model'
+        verbose_name_plural = 'UUID Models'
 
 
 class Day(UUIDModel):
@@ -21,7 +33,7 @@ class Route(UUIDModel):
     Model representing a user's travel route from location to destination.
     """
     user = models.ForeignKey(
-        'Api.CustomUser', 
+        'Auth.CustomUser', 
         on_delete=models.CASCADE, 
         related_name='routes',
         help_text='User who created this route'
@@ -81,7 +93,7 @@ class ScheduledRoute(UUIDModel):
     Model representing a recurring scheduled route.
     """
     user = models.ForeignKey(
-        'Api.CustomUser', 
+        'Auth.CustomUser', 
         on_delete=models.CASCADE, 
         related_name='scheduled_routes',
         help_text='User who created this scheduled route'

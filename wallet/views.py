@@ -24,15 +24,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, OpenApiExample
 
-from Api.views import get_user_from_token
-from Api.models import Notification
+from Auth.views import get_user_from_token
+from Profile.models import Notification
 from wallet.models import Wallet, Transaction
 from wallet.serializers import (
     WalletSerializer,
     TransactionSerializer,
     WithdrawalRequestSerializer,
 )
-from Api.models import CustomUser as User
+from Auth.models import CustomUser as User
 
 
 import logging

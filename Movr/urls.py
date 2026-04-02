@@ -3,16 +3,6 @@ URL configuration for Movr project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/5.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
 from django.urls import path, include
@@ -25,18 +15,23 @@ from drf_spectacular.views import (
 
 urlpatterns = [
     path('manager/', admin.site.urls),
-    path('', include('Api.urls')),
+    
+    # Auth API v1
+    path('auth/v1/', include('Auth.urls')),
+    
+    # Profile API v1
+    path('profile/v1/', include('Profile.urls')),
+    
+    # Other apps (keep existing for now, can add versioning later)
     path('wallet/', include('wallet.urls')),
     path('routes/', include('Routes.urls')),
     path('packages/', include('Packages.urls')),
     path('chat/', include('Chat.urls')),
     path('presence/', include('Presence.urls')),
     path('emergency/', include('Emergency.urls')),
-    # Schema
+    
+    # API Schema
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    # Swagger UI
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    # ReDoc UI (optional)
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
-

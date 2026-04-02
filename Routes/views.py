@@ -6,8 +6,8 @@ from rest_framework.authentication import TokenAuthentication
 from drf_spectacular.utils import extend_schema, OpenApiExample
 from django.utils import timezone
 
-from Api.models import CustomUser
-from Api.views import get_user_from_token
+from Auth.models import CustomUser
+from Auth.views import get_user_from_token
 from .models import Route, ScheduledRoute, Day
 from .serializers import RouteSerializer, ScheduledRouteSerializer, DaySerializer
 

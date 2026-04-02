@@ -2,7 +2,6 @@ from django.contrib import admin, messages
 from django.utils.html import format_html
 from django.db.models import Count
 from .models import CustomUser, KYC, Notification, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, \
     Badge, UserBadge, ReferralToken, Referral
 
 
@@ -47,49 +46,6 @@ class OTPAdmin(admin.ModelAdmin):
     list_display = ('user', 'code', 'is_used', 'created_at', 'expires_at')
     search_fields = ('user__email', 'code')
     list_filter = ('is_used', 'created_at', 'expires_at')
-
-@admin.register(Route)
-class RouteAdmin(admin.ModelAdmin):
-    list_display = ('user', 'title', 'location', 'destination', 'transportation_mode', 'service_type', 'departure_time', 'is_live')
-    search_fields = ('user__email', 'title', 'location', 'destination', 'transportation_mode')
-    list_filter = ('transportation_mode', 'service_type', 'is_live')
-    ordering = ('-departure_time',)
-
-@admin.register(ScheduledRoute)
-class ScheduledRouteAdmin(admin.ModelAdmin):
-    list_display = ('route', 'is_returning', 'is_repeated', 'returning_time')
-    search_fields = ('route__user__email', 'route__location', 'route__destination')
-    list_filter = ('is_returning', 'is_repeated')
-    ordering = ('-route__departure_time',)
-
-@admin.register(Day)
-class DayAdmin(admin.ModelAdmin):
-    list_display = ('name',)
-    search_fields = ('name',)
-    ordering = ('name',)
-
-
-@admin.register(Package)
-class PackageAdmin(admin.ModelAdmin):
-    list_display = ('user', 'location', 'destination', 'item_weight', 'range_radius')
-    search_fields = ('user__email', 'location', 'destination')
-    list_filter = ('item_weight', 'range_radius')
-
-@admin.register(Bid)
-class BidAdmin(admin.ModelAdmin):
-    list_display = ('package', 'mover', 'price', 'created_at')
-    search_fields = ('mover__email', 'package__location', 'package__destination')
-    list_filter = ('created_at',)
-
-@admin.register(QRCode)
-class QRCodeAdmin(admin.ModelAdmin):
-    list_display = ('code',)
-    search_fields = ('code',)
-
-@admin.register(PackageOffer)
-class PackageOfferAdmin(admin.ModelAdmin):
-    list_display = ('package_bid', 'qr_code', 'is_picked_up', 'is_delivered', 'is_scheduled', 'is_cancelled')
-    search_fields = ('package_bid__package__location', 'package_bid__package__destination', 'is_picked_up', 'is_delivered')
 
 @admin.register(Badge)
 class BadgeAdmin(admin.ModelAdmin):

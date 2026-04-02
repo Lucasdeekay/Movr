@@ -42,12 +42,13 @@ python manage.py seed_data
 python manage.py test
 pytest -q
 
-# Single test (Django)
-python manage.py test Api.tests.test_views.RegisterViewTestCase.test_successful_registration
+# Auth app tests
+python manage.py test Auth.tests
+pytest Auth/tests/ -v
 
-# Single test (pytest)
-pytest Api/tests/test_views.py::RegisterViewTestCase::test_successful_registration
-pytest -k test_successful_registration
+# Profile app tests
+python manage.py test Profile.tests
+pytest Profile/tests/ -v
 
 # Chat app tests
 python manage.py test Chat.tests
@@ -95,7 +96,8 @@ from django.db import models
 from rest_framework import status
 
 # Local
-from Api.models import CustomUser
+from Auth.models import CustomUser
+from Profile.models import KYC, Vehicle
 from wallet.services import create_dedicated_account
 ```
 
@@ -113,7 +115,7 @@ from wallet.services import create_dedicated_account
 - Models: `PascalCase` (e.g., `CustomUser`)
 - Views: `PascalCase` + `View` suffix
 - Serializers: `PascalCase` + `Serializer` suffix
-- URLs: `kebab-case` (e.g., `/api/register/`)
+- URLs: `kebab-case` with versioning (e.g., `/auth/v1/register/`)
 
 ---
 
@@ -121,27 +123,32 @@ from wallet.services import create_dedicated_account
 
 ### Core Apps
 
-#### 1. Api App (`Api/`)
-Core models and services:
+#### 1. Auth App (`Auth/`)
+**Models:**
 - `CustomUser` - Extended user with email, phone, profile_picture
+- `OTP` - One-time password for verification
+- `UUIDModel` - Base abstract model with UUID pk + timestamps
+
+**Views:**
+- `get_user_from_token(request)` - Helper to extract user from auth token
+
+**URLs:** `/auth/v1/`
+
+#### 2. Profile App (`Profile/`)
+**Models:**
 - `KYC` - Know Your Customer (bvn, nin, driver_license, verified)
 - `Vehicle` - Vehicle details (plate, type, brand, color, photos)
 - `SubscriptionPlan` - Plans: free, basic, rover, courier, courier_plus
 - `Subscription` - User subscription tracking
-- `OTP` - One-time password for verification
-- `Route` - User-created routes (location → destination)
-- `ScheduledRoute` - Recurring route schedules
-- `Package` - Package delivery requests
-- `Bid` - Offers on packages
-- `PackageOffer` - Accepted bid with tracking (picked_up, delivered, cancelled)
-- `QRCode` - Generated QR codes for package tracking
+- `SocialMediaLink` - User social media links
+- `Notification` - User notifications
 - `Badge`, `UserBadge` - Gamification
 - `ReferralToken`, `Referral` - Referral system
-- `Notification` - User notifications
-- `SocialMediaLink` - User social media links
-- `Day` - Days of week for scheduling
+- `UUIDModel` - Base abstract model with UUID pk + timestamps
 
-#### 2. Wallet App (`wallet/`)
+**URLs:** `/profile/v1/`
+
+#### 3. Wallet App (`wallet/`)
 **Models:**
 - `Wallet` - User wallet with balance, DVA (Dedicated Virtual Account)
 - `Transaction` - Deposit, withdrawal, transfer records
@@ -154,45 +161,57 @@ Core models and services:
 - `fetch_balance_from_monnify(wallet)` - Gets balance from Monnify
 - `initiate_withdrawal(user, amount, bank_name, account_number)` - Processes withdrawal
 
-#### 3. Routes App (`Routes/`)
+#### 4. Routes App (`Routes/`)
 - `Route`, `ScheduledRoute`, `Day` - Route management
+- `UUIDModel` - Base abstract model with UUID pk + timestamps
 
-#### 4. Packages App (`Packages/`)
-- `Package`, `Bid`, `PackageOffer` - Package delivery system
+#### 5. Packages App (`Packages/`)
+- `Package`, `Bid`, `PackageOffer`, `QRCode` - Package delivery system
+- `UUIDModel` - Base abstract model with UUID pk + timestamps
 
-#### 5. Chat App (`Chat/`)
+#### 6. Chat App (`Chat/`)
 - `ChatConversation`, `ChatMessage` - Real-time chat
+- `UUIDModel` - Base abstract model with UUID pk + timestamps
 
-#### 6. Presence App (`Presence/`)
+#### 7. Presence App (`Presence/`)
 - `UserPresence` - Online/offline status and location
+- `UUIDModel` - Base abstract model with UUID pk + timestamps
 
-#### 7. Emergency App (`Emergency/`)
+#### 8. Emergency App (`Emergency/`)
 - `EmergencySOS` - Emergency SOS alerts
+- `UUIDModel` - Base abstract model with UUID pk + timestamps
 
 ---
 
-## API Endpoints
+## API Endpoints (Versioned)
 
-### Authentication (`/api/`)
+### Authentication (`/auth/v1/`)
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/api/register/` | POST | No | User registration |
-| `/api/verify-otp/` | POST | No | Verify email via OTP |
-| `/api/resend-otp/` | POST | No | Resend OTP |
-| `/api/login/` | POST | No | User login |
-| `/api/logout/` | POST | Yes | User logout |
-| `/api/forgot-password/` | POST | No | Request password reset |
-| `/api/reset-password/` | POST | No | Reset password |
+| `/auth/v1/register/` | POST | No | User registration |
+| `/auth/v1/verify-otp/` | POST | No | Verify email via OTP |
+| `/auth/v1/resend-otp/` | POST | No | Resend OTP |
+| `/auth/v1/login/` | POST | No | User login |
+| `/auth/v1/logout/` | POST | Yes | User logout |
+| `/auth/v1/forgot-password/` | POST | No | Request password reset |
+| `/auth/v1/reset-password/` | POST | No | Reset password |
+| `/auth/v1/api/users/` | GET/POST | Yes | User ViewSet |
 
-### User Profile (`/api/`)
+### User Profile (`/profile/v1/`)
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/api/update-kyc/` | POST | Yes | Update KYC info |
-| `/api/update-vehicle/` | POST | Yes | Update vehicle info |
-| `/api/update-personal-info/` | POST | Yes | Update name/phone |
-| `/api/upload-profile-image/` | POST | Yes | Upload profile picture |
-| `/api/update-subscription/` | POST | Yes | Change subscription plan |
-| `/api/api/users/` | GET/POST | Yes | User ViewSet |
+| `/profile/v1/update-kyc/` | POST | Yes | Update KYC info |
+| `/profile/v1/update-vehicle/` | POST | Yes | Update vehicle info |
+| `/profile/v1/update-personal-info/` | POST | Yes | Update name/phone |
+| `/profile/v1/upload-profile-image/` | POST | Yes | Upload profile picture |
+| `/profile/v1/update-subscription/` | POST | Yes | Change subscription plan |
+| `/profile/v1/notifications/` | GET | Yes | Get notifications |
+| `/profile/v1/notifications/<uuid>/mark-read/` | POST | Yes | Mark notification read |
+| `/profile/v1/social-media/` | POST | Yes | Update social media links |
+| `/profile/v1/api/kyc/` | GET/POST | Yes | KYC ViewSet |
+| `/profile/v1/api/vehicles/` | GET/POST | Yes | Vehicle ViewSet |
+| `/profile/v1/api/subscription-plans/` | GET/POST | Yes | SubscriptionPlan ViewSet |
+| `/profile/v1/api/notifications/` | GET/POST | Yes | Notification ViewSet |
 
 ### Routes (`/routes/`)
 | Endpoint | Method | Auth | Description |
@@ -338,6 +357,8 @@ POSTGRES_PORT=
 
 ### Authentication Helper
 ```python
+from Auth.views import get_user_from_token
+
 def get_user_from_token(request):
     try:
         token = request.headers.get('Authorization', '').split(' ')[1]

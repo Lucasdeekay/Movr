@@ -1,5 +1,17 @@
 from django.db import models
-from Api.models import UUIDModel
+import uuid
+
+
+class UUIDModel(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_column='id')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+        ordering = ('-created_at',)
+        verbose_name = 'UUID Model'
+        verbose_name_plural = 'UUID Models'
 
 
 class Package(UUIDModel):
@@ -15,7 +27,7 @@ class Package(UUIDModel):
     ]
 
     user = models.ForeignKey(
-        'Api.CustomUser',
+        'Auth.CustomUser',
         on_delete=models.CASCADE,
         related_name='packages',
         help_text='User who created this package request'
@@ -50,7 +62,7 @@ class Bid(UUIDModel):
     Model representing a bid on a package.
     """
     package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name='bids')
-    bidder = models.ForeignKey('Api.CustomUser', on_delete=models.CASCADE, related_name='bids')
+    bidder = models.ForeignKey('Auth.CustomUser', on_delete=models.CASCADE, related_name='bids')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     message = models.TextField(null=True, blank=True)
     estimated_arrival = models.DateTimeField(null=True, blank=True)
@@ -72,7 +84,7 @@ class PackageOffer(UUIDModel):
     """
     package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name='offers')
     bid = models.OneToOneField(Bid, on_delete=models.CASCADE, related_name='offer')
-    driver = models.ForeignKey('Api.CustomUser', on_delete=models.CASCADE, related_name='accepted_offers')
+    driver = models.ForeignKey('Auth.CustomUser', on_delete=models.CASCADE, related_name='accepted_offers')
     agreed_amount = models.DecimalField(max_digits=10, decimal_places=2)
     picked_up = models.BooleanField(default=False)
     picked_up_at = models.DateTimeField(null=True, blank=True)

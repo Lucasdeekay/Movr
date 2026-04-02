@@ -10,7 +10,8 @@ from Movr import settings
 from .monnify import MonnifyError
 from .monnify_service import DedicatedAccountService   # the file we built earlier
 from wallet.models import Wallet, Transaction, Withdrawal, Bank
-from Api.models import KYC, CustomUser as User
+from Profile.models import KYC
+from Auth.models import CustomUser as User
 
 # ---- singleton service instance ---- #
 DEDICATED_SERVICE = DedicatedAccountService(

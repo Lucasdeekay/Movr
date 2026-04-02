@@ -6,7 +6,7 @@ from Routes.models import Route
 from Packages.models import Package
 from Chat.models import ChatConversation, ChatMessage
 from Presence.models import UserPresence
-from .models import CustomUser
+from Auth.models import CustomUser
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver

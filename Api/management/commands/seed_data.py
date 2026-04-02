@@ -3,7 +3,8 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from decimal import Decimal
 
-from Api.models import SubscriptionPlan, Day
+from Profile.models import SubscriptionPlan
+from Routes.models import Day
 
 User = get_user_model()
 

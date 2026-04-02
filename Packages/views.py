@@ -7,7 +7,7 @@ from drf_spectacular.utils import extend_schema, OpenApiExample
 from django.db import models
 from django.utils import timezone
 
-from Api.views import get_user_from_token
+from Auth.views import get_user_from_token
 from .models import Package, Bid, PackageOffer, QRCode
 from .serializers import PackageSerializer, BidSerializer, PackageOfferSerializer
 

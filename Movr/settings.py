@@ -44,7 +44,8 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'drf_spectacular',
     'channels',
-    'Api',
+    'Auth',
+    'Profile',
     'wallet',
     'Routes',
     'Packages',
@@ -180,7 +181,7 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
-AUTH_USER_MODEL = 'Api.CustomUser'
+AUTH_USER_MODEL = 'Auth.CustomUser'
 
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True

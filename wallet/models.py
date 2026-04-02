@@ -11,9 +11,22 @@ from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.core.validators import MinValueValidator, MaxValueValidator
+import uuid
 
-from Api.models import CustomUser as User
-from Api.models import UUIDModel
+
+class UUIDModel(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_column='id')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+        ordering = ('-created_at',)
+        verbose_name = 'UUID Model'
+        verbose_name_plural = 'UUID Models'
+
+
+from Auth.models import CustomUser as User
 
 
 class Wallet(UUIDModel):
