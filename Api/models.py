@@ -20,31 +20,17 @@ from Movr import settings
 import uuid
 
 class UUIDModel(models.Model):
-    """
-    An abstract base class that provides primary key field 'id' 
-    as a UUID instead of the default AutoField (integer).
-    """
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-        # The db_column is optional, but sometimes useful for clarity
-        db_column='id' 
-    )
-    
-    # You might also want common audit fields here:
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_column='id')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         abstract = True
-        # Setting ordering here is generally not recommended for UUIDs, 
-        # but you can order by creation time.
         ordering = ('-created_at',)
         verbose_name = 'UUID Model'
         verbose_name_plural = 'UUID Models'
 
-# User Manager
+
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
@@ -58,11 +44,9 @@ class UserManager(BaseUserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-
         return self.create_user(email, password, **extra_fields)
 
 
-# Custom User Model
 class CustomUser(AbstractBaseUser, PermissionsMixin, UUIDModel):
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=50, null=True, blank=True)
@@ -75,7 +59,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin, UUIDModel):
     is_staff = models.BooleanField(default=False)
 
     objects = UserManager()
-
     USERNAME_FIELD = 'email'
 
     class Meta:
@@ -97,7 +80,6 @@ class KYC(UUIDModel):
     class Meta:
         verbose_name = "KYC"
         verbose_name_plural = "KYC Records"
-        ordering = ("-created_at",)
 
     def __str__(self):
         return f"KYC for {self.user.email}"
@@ -112,7 +94,6 @@ class SocialMediaLink(UUIDModel):
     class Meta:
         verbose_name = "Social Media Link"
         verbose_name_plural = "Social Media Links"
-        ordering = ("-created_at",)
 
     def __str__(self):
         return f"Social media link for {self.user.email}"
@@ -132,35 +113,21 @@ class Vehicle(UUIDModel):
     class Meta:
         verbose_name = "Vehicle"
         verbose_name_plural = "Vehicles"
-        ordering = ("-created_at",)
 
     def __str__(self):
         return f"Vehicle Details for {self.user.email}"
 
 
 class SubscriptionPlan(UUIDModel):
-    NAME_CHOICES = (
-        ('free', 'FREE'),
-        ('basic', 'BASIC'),
-        ('rover', 'ROVER'),
-        ('courier', 'COURIER'),
-        ('courier_plus', 'COURIER PLUS'),
-    )
-    PRICE_CHOICES = (
-        (Decimal(0.00), '#0.00'),
-        (Decimal(1200.00), '#1,200'),
-        (Decimal(4500.00), '#4,500'),
-        (Decimal(9400.00), '#9,400'),
-        (Decimal(15200.00), '#15,200')
-    )
+    NAME_CHOICES = (('free', 'FREE'), ('basic', 'BASIC'), ('rover', 'ROVER'), ('courier', 'COURIER'), ('courier_plus', 'COURIER PLUS'))
+    PRICE_CHOICES = ((Decimal(0.00), '#0.00'), (Decimal(1200.00), '#1,200'), (Decimal(4500.00), '#4,500'), (Decimal(9400.00), '#9,400'), (Decimal(15200.00), '#15,200'))
     name = models.CharField(max_length=100, default='free', choices=NAME_CHOICES)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal(0.00), choices=PRICE_CHOICES)
-    duration = models.IntegerField(default=30, help_text="Duration in days")
+    duration = models.IntegerField(default=30)
 
     class Meta:
         verbose_name = "Subscription Plan"
         verbose_name_plural = "Subscription Plans"
-        ordering = ("-created_at",)
 
     def __str__(self):
         return self.name
@@ -170,12 +137,11 @@ class Subscription(UUIDModel):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='subscriptions')
     plan = models.ForeignKey(SubscriptionPlan, on_delete=models.CASCADE)
     start_date = models.DateField(auto_now_add=True)
-    end_date = models.DateField(blank=True, null=True)  # Allow end_date to be blank initially
+    end_date = models.DateField(blank=True, null=True)
 
     class Meta:
         verbose_name = "Subscription"
         verbose_name_plural = "Subscriptions"
-        ordering = ("-created_at",)
 
     def __str__(self):
         return f"{self.user.email} - {self.plan.name}"
@@ -190,7 +156,6 @@ class OTP(UUIDModel):
     class Meta:
         verbose_name = "OTP"
         verbose_name_plural = "OTPs"
-        ordering = ("-created_at",)
         unique_together = ("user", "code")
 
     def save(self, *args, **kwargs):
@@ -206,215 +171,8 @@ class OTP(UUIDModel):
         return timezone.now() > self.expires_at
 
     def send_otp(self):
-        # You can use any email sending method here
-        send_mail(
-            'Your OTP Code',
-            f'Your OTP code is {self.code}. It expires in 1 hour.',
-            settings.EMAIL_HOST_USER,
-            [self.user.email],
-            fail_silently=False,
-        )
+        send_mail('Your OTP Code', f'Your OTP code is {self.code}. It expires in 1 hour.', settings.EMAIL_HOST_USER, [self.user.email], fail_silently=False)
 
-
-class Day(UUIDModel):
-    DAY_CHOICES = [
-        ('monday', 'Monday'),
-        ('tuesday', 'Tuesday'),
-        ('wednesday', 'Wednesday'),
-        ('thursday', 'Thursday'),
-        ('friday', 'Friday'),
-        ('saturday', 'Saturday'),
-        ('sunday', 'Sunday'),
-    ]
-    name = models.CharField(max_length=10, choices=DAY_CHOICES, unique=True)
-
-    class Meta:
-        verbose_name = "Day"
-        verbose_name_plural = "Days"
-        ordering = ("name",)
-
-    def __str__(self):
-        return self.name
-
-
-class Route(UUIDModel):
-    TRANSPORTATION_MODE_CHOICES = [
-        ('public', 'Public'),
-        ('bike', 'Bike'),
-        ('car', 'Car'),
-        ('train', 'Train'),
-        ('bus', 'Bus'),
-        ('aeroplane', 'Aeroplane'),
-    ]
-
-    SERVICE_TYPE_CHOICES = [
-        ('ride', 'Ride'),
-        ('delivery', 'Delivery'),
-    ]
-
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='routes')
-    title = models.CharField(max_length=255)
-    location = models.CharField(max_length=255)
-    location_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    location_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    destination = models.CharField(max_length=255)
-    destination_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    destination_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    stop_location = models.CharField(max_length=255, null=True, blank=True)
-    stop_location_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    stop_location_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    transportation_mode = models.CharField(max_length=20, choices=TRANSPORTATION_MODE_CHOICES)
-    service_type = models.CharField(max_length=20, choices=SERVICE_TYPE_CHOICES, null=True, blank=True)
-    departure_time = models.DateTimeField()
-    ticket_image = models.ImageField(upload_to='tickets/', null=True, blank=True)
-    is_live = models.BooleanField(default=True)
-    radius_range = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Radius in km")
-
-    class Meta:
-        verbose_name = "Route"
-        verbose_name_plural = "Routes"
-        ordering = ("-created_at",)
-    
-    def __str__(self):
-        return f"Route from {self.location} to {self.destination} by {self.user.email}"
-
-
-class ScheduledRoute(UUIDModel):
-    route = models.OneToOneField(Route, on_delete=models.CASCADE, related_name='scheduled_route')
-    is_returning = models.BooleanField(default=False)
-    returning_time = models.DateTimeField(null=True, blank=True)
-    is_repeated = models.BooleanField(default=False)
-    days_of_week = models.ManyToManyField('Day', blank=True)
-
-    class Meta:
-        verbose_name = "Scheduled Route"
-        verbose_name_plural = "Scheduled Routes"
-        ordering = ("-created_at",)
-    
-    def __str__(self):
-        return f"Scheduled Route for {self.route.user.email} from {self.route.location} to {self.route.destination}"
-
-
-class Package(UUIDModel):
-    WEIGHT_CHOICES = [
-        ('light', 'Light'),
-        ('medium', 'Medium'),
-        ('heavy', 'Heavy'),
-    ]
-    PACKAGE_TYPE = [
-        ('Delivery', 'Delivery'),
-        ('Rideshare', 'Rideshare'),
-        ('Schedule', 'Schedule'),
-    ]
-
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='packages')
-    location = models.CharField(max_length=255)
-    location_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    location_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    destination = models.CharField(max_length=255)
-    destination_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    destination_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    package_type = models.CharField(max_length=20, choices=PACKAGE_TYPE)
-    item_image = models.ImageField(upload_to='package_images/', null=True, blank=True)
-    item_description = models.TextField(null=True, blank=True)
-    item_weight = models.CharField(max_length=10, null=True, blank=True, choices=WEIGHT_CHOICES)
-    receiver_name = models.CharField(null=True, blank=True, max_length=100)
-    receiver_phone_number = models.CharField(null=True, blank=True, max_length=15)
-    range_radius = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Radius in km")
-
-    class Meta:
-        verbose_name = "Package"
-        verbose_name_plural = "Packages"
-        ordering = ("-created_at",)
-    
-    def __str__(self):
-        return f"Package from {self.location} to {self.destination} by {self.user.email}"
-
-
-# Bid Model
-class Bid(UUIDModel):
-    package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name='bids')
-    mover = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='bids')
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-
-    class Meta:
-        verbose_name = "Bid"
-        verbose_name_plural = "Bids"
-        ordering = ("-created_at",)
-
-    def __str__(self):
-        return f"Bid by {self.mover.email} for {self.price}"
-
-
-# QR Code Model
-class QRCode(UUIDModel):
-    code = models.CharField(max_length=6, unique=True)
-    qr_image = models.ImageField(upload_to='qr_codes/', null=True, blank=True)
-
-    class Meta:
-        verbose_name = "QR Code"
-        verbose_name_plural = "QR Codes"
-        ordering = ("-created_at",)
-
-    def save(self, *args, **kwargs):
-        if not self.code:
-            self.code = ''.join(random.choices(string.digits, k=6))
-
-        # Generate QR code
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
-        )
-        qr.add_data(self.code)
-        qr.make(fit=True)
-        img = qr.make_image(fill='black', back_color='white')
-
-        # Save the QR code image
-        buffer = BytesIO()
-        img.save(buffer, format="PNG")
-        self.qr_image.save(f'{self.code}_qr.png', File(buffer), save=False)
-        super().save(*args, **kwargs)
-
-
-class PackageOffer(UUIDModel):
-    package_bid = models.ForeignKey(Bid, on_delete=models.CASCADE, related_name='package_offers')
-    qr_code = models.ForeignKey(QRCode, on_delete=models.CASCADE, related_name='package_offers')
-    is_picked_up = models.BooleanField(default=False)
-    is_delivered = models.BooleanField(default=False)
-    is_scheduled = models.BooleanField(default=False)  # New field to indicate scheduling
-    is_cancelled = models.BooleanField(default=False)  # New field to track cancellations
-
-    class Meta:
-        verbose_name = "Package Offer"
-        verbose_name_plural = "Package Offers"
-        ordering = ("-created_at",)
-
-    def __str__(self):
-        return f"Package Offer for {self.package_bid.package.location} to {self.package_bid.package.destination}"
-
-
-# class Transaction(UUIDModel):
-#     TRANSACTION_TYPE_CHOICES = [
-#         ("deposit", "Deposit"),
-#         ("withdrawal", "Withdrawal"),
-#         ("transfer", "Transfer"),
-#     ]
-
-#     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transactions")
-#     transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPE_CHOICES)
-#     amount = models.DecimalField(max_digits=12, decimal_places=2)
-#     timestamp = models.DateTimeField(default=timezone.now)
-#     description = models.TextField(null=True, blank=True)
-
-#     class Meta:
-#         verbose_name = "Transaction"
-#         verbose_name_plural = "Transactions"
-#         ordering = ("-timestamp",)
-
-#     def __str__(self):
-#         return f"{self.user.email} - {self.transaction_type.capitalize()} - {self.amount}"
 
 class Badge(UUIDModel):
     name = models.CharField(max_length=100)
@@ -425,10 +183,10 @@ class Badge(UUIDModel):
     class Meta:
         verbose_name = "Badge"
         verbose_name_plural = "Badges"
-        ordering = ("name",)
 
     def __str__(self):
         return self.name
+
 
 class UserBadge(UUIDModel):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='badges')
@@ -438,358 +196,62 @@ class UserBadge(UUIDModel):
     class Meta:
         verbose_name = "User Badge"
         verbose_name_plural = "User Badges"
-        ordering = ("-awarded_at",)
 
     def __str__(self):
         return f"{self.user.email} - {self.badge.name}"
 
 
 class ReferralToken(UUIDModel):
-    """
-    Represents a unique referral token for a user.
-    """
-    user = models.OneToOneField(
-        CustomUser,
-        on_delete=models.CASCADE,
-        related_name='referral_token'
-    )
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='referral_token')
     token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
     class Meta:
         verbose_name = "Referral Token"
         verbose_name_plural = "Referral Tokens"
-        ordering = ("-created_at",)
 
     def __str__(self):
         return f"{self.user.email}'s Referral Token"
 
 
 class Referral(UUIDModel):
-    """
-    Represents a referral made by a user using a referral token.
-    """
-    referred_by = models.ForeignKey(
-        CustomUser,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='referrals'
-    )
-    referred_user = models.OneToOneField(
-        CustomUser,
-        on_delete=models.CASCADE,
-        related_name='referred_details'
-    )
+    referred_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='referrals')
+    referred_user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='referred_details')
     token_used = models.UUIDField()
 
     class Meta:
         verbose_name = "Referral"
         verbose_name_plural = "Referrals"
-        ordering = ("-created_at",)
 
     def __str__(self):
         return f"{self.referred_user.email} referred by {self.referred_by.email if self.referred_by else 'Unknown'}"
 
     @staticmethod
     def create_referral(referred_user, token):
-        """
-        Static method to create a referral.
-        """
         try:
             referrer = ReferralToken.objects.get(token=token).user
         except ReferralToken.DoesNotExist:
             referrer = None
+        Referral.objects.create(referred_by=referrer, referred_user=referred_user, token_used=token)
 
-        Referral.objects.create(
-            referred_by=referrer,
-            referred_user=referred_user,
-            token_used=token
-        )
 
 class Notification(UUIDModel):
-    """
-    Model representing a notification sent to a user.
-    
-    Manages user notifications including titles, messages, read status,
-    and creation timestamps for tracking user engagement.
-    """
-    user = models.ForeignKey(
-        CustomUser, 
-        on_delete=models.CASCADE, 
-        related_name="notifications",
-        help_text="User who receives the notification"
-    )
-    title = models.CharField(
-        max_length=200, 
-        null=True, 
-        blank=True,
-        help_text="Title of the notification"
-    )
-    message = models.TextField(
-        help_text="Content/message of the notification"
-    )
-    is_read = models.BooleanField(
-        default=False, 
-        help_text="Whether the notification has been read"
-    )
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="notifications")
+    title = models.CharField(max_length=200, null=True, blank=True)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-created_at']
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"
-        indexes = [
-            models.Index(fields=['user', '-created_at']),
-            models.Index(fields=['is_read', '-created_at']),
-        ]
 
-    def __str__(self) -> str:
-        """String representation of the Notification."""
-        title = self.title or "No Title"
-        return f"Notification for {self.user.email} - {title}"
+    def __str__(self):
+        return f"Notification for {self.user.email} - {self.title or 'No Title'}"
 
     def mark_as_read(self):
-        """
-        Mark the notification as read.
-        
-        Updates the is_read field to True.
-        """
         self.is_read = True
-        self.save(update_fields=['is_read'])
-
-    def mark_as_unread(self):
-        """
-        Mark the notification as unread.
-        
-        Updates the is_read field to False.
-        """
-        self.is_read = False
         self.save(update_fields=['is_read'])
 
     @classmethod
     def get_unread_count(cls, user):
-        """
-        Get count of unread notifications for a user.
-        
-        Args:
-            user: User instance
-            
-        Returns:
-            int: Count of unread notifications
-        """
         return cls.objects.filter(user=user, is_read=False).count()
-
-    @classmethod
-    def mark_all_as_read(cls, user):
-        """
-        Mark all notifications as read for a user.
-        
-        Args:
-            user: User instance
-            
-        Returns:
-            int: Number of notifications marked as read
-        """
-        return cls.objects.filter(user=user, is_read=False).update(is_read=True)
-
-
-class ChatConversation(UUIDModel):
-    """
-    Model representing a chat conversation between users.
-    
-    A conversation can be associated with a trip (PackageOffer) for
-    contextual chat during delivery, or be standalone for general messaging.
-    """
-    participants = models.ManyToManyField(
-        CustomUser, 
-        related_name='conversations',
-        help_text='Users participating in this conversation'
-    )
-    trip = models.ForeignKey(
-        'PackageOffer', 
-        on_delete=models.CASCADE, 
-        null=True, 
-        blank=True,
-        related_name='chat_conversations',
-        help_text='Associated trip/delivery (optional)'
-    )
-    is_active = models.BooleanField(
-        default=True,
-        help_text='Whether conversation is active'
-    )
-
-    class Meta:
-        ordering = ['-created_at']
-        verbose_name = "Chat Conversation"
-        verbose_name_plural = "Chat Conversations"
-
-    def __str__(self):
-        participant_names = ", ".join([u.email for u in self.participants.all()[:3]])
-        return f"Conversation: {participant_names}"
-
-
-class ChatMessage(UUIDModel):
-    """
-    Model representing a message in a chat conversation.
-    
-    Stores individual messages with sender info, read status,
-    and timestamps.
-    """
-    conversation = models.ForeignKey(
-        ChatConversation, 
-        on_delete=models.CASCADE, 
-        related_name='messages',
-        help_text='Conversation this message belongs to'
-    )
-    sender = models.ForeignKey(
-        CustomUser, 
-        on_delete=models.CASCADE, 
-        related_name='sent_messages',
-        help_text='User who sent the message'
-    )
-    message = models.TextField(
-        help_text='Message content'
-    )
-    is_read = models.BooleanField(
-        default=False,
-        help_text='Whether message has been read'
-    )
-    read_at = models.DateTimeField(
-        null=True, 
-        blank=True,
-        help_text='When message was read'
-    )
-
-    class Meta:
-        ordering = ['created_at']
-        verbose_name = "Chat Message"
-        verbose_name_plural = "Chat Messages"
-
-    def __str__(self):
-        return f"Message from {self.sender.email}: {self.message[:30]}..."
-
-
-class UserPresence(UUIDModel):
-    """
-    Model representing user online/offline presence status.
-    
-    Tracks user presence for real-time features like showing
-    online drivers or delivery personnel.
-    """
-    user = models.OneToOneField(
-        CustomUser, 
-        on_delete=models.CASCADE, 
-        related_name='presence',
-        help_text='User presence record'
-    )
-    is_online = models.BooleanField(
-        default=False,
-        help_text='Whether user is currently online'
-    )
-    last_seen = models.DateTimeField(
-        auto_now=True,
-        help_text='Last time user was seen online'
-    )
-    current_latitude = models.DecimalField(
-        max_digits=9, 
-        decimal_places=6, 
-        null=True, 
-        blank=True,
-        help_text='Current latitude location'
-    )
-    current_longitude = models.DecimalField(
-        max_digits=9, 
-        decimal_places=6, 
-        null=True, 
-        blank=True,
-        help_text='Current longitude location'
-    )
-    location_updated_at = models.DateTimeField(
-        null=True, 
-        blank=True,
-        help_text='Last time location was updated'
-    )
-
-    class Meta:
-        ordering = ['-last_seen']
-        verbose_name = "User Presence"
-        verbose_name_plural = "User Presences"
-
-    def __str__(self):
-        status = "online" if self.is_online else "offline"
-        return f"{self.user.email} - {status}"
-
-
-class EmergencySOS(UUIDModel):
-    """
-    Model representing an emergency SOS alert.
-    
-    Users can trigger SOS alerts during trips for immediate
-    assistance. Admin can monitor and respond to alerts.
-    """
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('acknowledged', 'Acknowledged'),
-        ('resolved', 'Resolved'),
-        ('cancelled', 'Cancelled'),
-    ]
-
-    user = models.ForeignKey(
-        CustomUser, 
-        on_delete=models.CASCADE, 
-        related_name='sos_alerts',
-        help_text='User who triggered the SOS'
-    )
-    trip = models.ForeignKey(
-        'PackageOffer', 
-        on_delete=models.CASCADE, 
-        null=True, 
-        blank=True,
-        related_name='sos_alerts',
-        help_text='Trip during which SOS was triggered'
-    )
-    latitude = models.DecimalField(
-        max_digits=9, 
-        decimal_places=6, 
-        null=True, 
-        blank=True,
-        help_text='Location latitude where SOS was triggered'
-    )
-    longitude = models.DecimalField(
-        max_digits=9, 
-        decimal_places=6, 
-        null=True, 
-        blank=True,
-        help_text='Location longitude where SOS was triggered'
-    )
-    message = models.TextField(
-        null=True, 
-        blank=True,
-        help_text='Optional message from user'
-    )
-    status = models.CharField(
-        max_length=20, 
-        choices=STATUS_CHOICES, 
-        default='pending',
-        help_text='Current status of the SOS alert'
-    )
-    acknowledged_by = models.ForeignKey(
-        CustomUser, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='acknowledged_sos',
-        help_text='Admin who acknowledged the SOS'
-    )
-    resolved_at = models.DateTimeField(
-        null=True, 
-        blank=True,
-        help_text='When the SOS was resolved'
-    )
-
-    class Meta:
-        ordering = ['-created_at']
-        verbose_name = "Emergency SOS"
-        verbose_name_plural = "Emergency SOS Alerts"
-
-    def __str__(self):
-        return f"SOS from {self.user.email} - {self.status}"

@@ -26,9 +26,12 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExampl
 
 from wallet.models import Transaction, Wallet
 from wallet.services import create_dedicated_account_for_user
-from .models import Route, ScheduledRoute, Day, Package, Bid, PackageOffer, QRCode
+from Routes.models import Route, ScheduledRoute, Day
+from Packages.models import Package, Bid, PackageOffer, QRCode
+from Chat.models import ChatConversation, ChatMessage
+from Presence.models import UserPresence
+from Emergency.models import EmergencySOS
 from .models import CustomUser, KYC, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink
-from .models import ChatConversation, ChatMessage, UserPresence, EmergencySOS
 from .serializers import CustomUserSerializer, OTPVerificationSerializer, TokenSerializer, VehicleSerializer, \
     KYCSerializer, SocialMediaLinkSerializer, RouteSerializer, ScheduledRouteSerializer, PackageSerializer, \
     BidSerializer, PackageOfferSerializer, ChatConversationSerializer, ChatMessageSerializer, \

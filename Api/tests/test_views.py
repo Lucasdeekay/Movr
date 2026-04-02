@@ -25,8 +25,9 @@ from rest_framework.test import APIClient, APITestCase
 from django.contrib.auth import get_user_model
 from rest_framework.authtoken.models import Token
 
-from Api.models import KYC, Vehicle, Subscription, SubscriptionPlan, OTP, CustomUser, SocialMediaLink, Route, Day, \
-    ScheduledRoute, Package, Bid, QRCode, PackageOffer
+from Api.models import KYC, Vehicle, Subscription, SubscriptionPlan, OTP, CustomUser, SocialMediaLink
+from Routes.models import Route, Day, ScheduledRoute
+from Packages.models import Package, Bid, QRCode, PackageOffer
 
 from Api.models import SubscriptionPlan
 from Api.views import get_user_from_token, RegisterView

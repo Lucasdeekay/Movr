@@ -2,7 +2,11 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth.models import AnonymousUser
 from rest_framework.authtoken.models import Token
 import json
-from .models import Route, CustomUser, Package, UserPresence, ChatConversation, ChatMessage
+from Routes.models import Route
+from Packages.models import Package
+from Chat.models import ChatConversation, ChatMessage
+from Presence.models import UserPresence
+from .models import CustomUser
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver

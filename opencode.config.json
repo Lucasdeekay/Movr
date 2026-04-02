@@ -1,0 +1,32 @@
+{
+  "provider": "zen",
+  "model": "auto",
+
+  "request": {
+    "timeout": 90000,
+    "maxRetries": 8,
+    "retryDelay": 5000,
+    "backoffFactor": 2
+  },
+
+  "rateLimit": {
+    "maxRequestsPerMinute": 8,
+    "maxConcurrentRequests": 1
+  },
+
+  "throttle": {
+    "enabled": true,
+    "delayBetweenRequests": 3000
+  },
+
+  "cache": {
+    "enabled": true,
+    "ttl": 7200
+  },
+
+  "stream": true,
+
+  "logging": {
+    "level": "error"
+  }
+}

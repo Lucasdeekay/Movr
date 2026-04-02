@@ -8,7 +8,7 @@ import hashlib
 import os
 from django.http import HttpResponse
 from django.utils import timezone
-import json # Import json for Paystack response parsing
+import json
 
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -19,19 +19,20 @@ from django.db.models import Q
 
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema, OpenApiExample
 
 from Api.views import get_user_from_token
 from Api.models import Notification
 from wallet.models import Wallet, Transaction
 from wallet.serializers import (
-    WalletSerializer, # Use WalletSerializer for full wallet details
+    WalletSerializer,
     TransactionSerializer,
-    WithdrawalRequestSerializer, # For user input
+    WithdrawalRequestSerializer,
 )
-from Api.models import CustomUser as User # Ensure User model is correctly imported
+from Api.models import CustomUser as User
 
 
 import logging
@@ -64,6 +65,34 @@ class WalletDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        responses={200: dict},
+        tags=['Wallet'],
+    )
+    def get(self, request):
+        user = get_user_from_token(request)
+        wallet, _ = Wallet.objects.get_or_create(user=user)
+
+        try:
+            transactions = Transaction.objects.filter(user=user).order_by('-created_at')[:5]
+            transactions_data = TransactionSerializer(transactions, many=True).data
+        except Exception as e:
+            transactions_data = []
+
+        wallet_data = WalletSerializer(wallet).data
+        
+        return Response({"wallet_details": wallet_data,
+            "recent_transactions": transactions_data,}, status=status.HTTP_200_OK)
+
+
+class AllTransactionsView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={200: dict},
+        tags=['Wallet'],
+    )
     def get(self, request):
         user = get_user_from_token(request)
         wallet, _ = Wallet.objects.get_or_create(user=user)
@@ -96,14 +125,15 @@ class AllTransactionsView(APIView):
 @method_decorator(cache_page(60 * 2), name='get')
 class TransactionDetailView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated] # Enable permission
+    permission_classes = [IsAuthenticated]
 
-    def get(self, request, pk): # Use 'pk' (primary key) for detail view conventions
+    @extend_schema(
+        responses={200: dict, 404: dict},
+        tags=['Wallet'],
+    )
+    def get(self, request, pk):
         try:
             user = get_user_from_token(request)
-
-            # Fetch the specific transaction for the user
-            # Use get_object_or_404 for cleaner error handling
             transaction = Transaction.objects.get(Q(id=pk) & Q(user=user))
             transaction_data = TransactionSerializer(transaction).data
 
@@ -113,7 +143,7 @@ class TransactionDetailView(APIView):
         except Transaction.DoesNotExist:
             logger.warning(f"Transaction not found or does not belong to user: {user.email if 'user' in locals() else 'unknown'}")
             return Response({"message": "Transaction not found or does not belong to this user."}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e: # Catch other potential errors like invalid UUID if pk is UUIDField
+        except Exception as e:
             logger.error(f"Unexpected error fetching transaction detail: {str(e)}")
             return Response({"message": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -122,6 +152,11 @@ class WithdrawalRequestView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=WithdrawalRequestSerializer,
+        responses={201: dict, 400: dict},
+        tags=['Wallet'],
+    )
     def post(self, request):
         user = get_user_from_token(request)
         serializer = WithdrawalRequestSerializer(data=request.data)
@@ -140,15 +175,21 @@ class WithdrawalRequestView(APIView):
         
 
 
-@method_decorator(csrf_exempt, name='dispatch') # Disable CSRF for webhook endpoint
+@method_decorator(csrf_exempt, name='dispatch')
 class MonnifyWebhookView(APIView):
     """
-    POST  /webhooks/monnify/
-    No auth – Monnify signs the payload instead.
+    Webhook endpoint for Monnify payment notifications.
+    
+    No authentication required - Monnify signs the payload instead.
     """
     authentication_classes = []
-    permission_classes = []
+    permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=dict,
+        responses={200: dict, 400: dict, 403: dict},
+        tags=['Wallet'],
+    )
     def post(self, request, *args, **kwargs):
         sig = request.headers.get("monnify-signature")
         if not _verify_monnify_signature(request.body, sig):
@@ -281,17 +322,26 @@ class MonnifyWebhookView(APIView):
 
 @method_decorator(cache_page(60 * 2), name='get')
 class FetchBanksView(APIView):
-    authentication_classes = [] # No authentication for webhooks
-    permission_classes = []     # No permissions for webhooks
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
+    @extend_schema(
+        responses={200: dict},
+        tags=['Wallet'],
+    )
     def get(self, request, *args, **kwargs):
         bank_list = get_active_banks()
         return Response({"banks": bank_list}, status=status.HTTP_200_OK)
     
 class ValidateAccountView(APIView):
-    authentication_classes = [] # No authentication for webhooks
-    permission_classes = []     # No permissions for webhooks
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=dict,
+        responses={200: dict, 400: dict},
+        tags=['Wallet'],
+    )
     def post(self, request, *args, **kwargs):
         account_number = request.data.get("account_number")
         bank_code = request.data.get("bank_code")

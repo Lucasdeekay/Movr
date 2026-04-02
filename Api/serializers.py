@@ -4,10 +4,13 @@ from decimal import Decimal
 
 from Api.utils import upload_to_cloudinary
 from wallet.services import update_bvn_on_reserved_account
-
+from Routes.models import Route, ScheduledRoute, Day
+from Packages.models import Package, Bid, QRCode, PackageOffer
+from Chat.models import ChatConversation, ChatMessage
+from Presence.models import UserPresence
+from Emergency.models import EmergencySOS
 from .models import CustomUser, KYC, Notification, Vehicle, SubscriptionPlan, Subscription, OTP, SocialMediaLink, \
-    Route, ScheduledRoute, Day, Package, Bid, QRCode, PackageOffer, \
-    Badge, UserBadge, ReferralToken, Referral, ChatConversation, ChatMessage, UserPresence, EmergencySOS
+    Badge, UserBadge, ReferralToken, Referral
 
 import logging
 
