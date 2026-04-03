@@ -264,27 +264,4 @@ SPECTACULAR_SETTINGS = {
         {'name': 'Wallet', 'description': 'Wallet and payment management'},
         {'name': 'Real-Time', 'description': 'WebSocket and real-time features'},
     ],
-
-    'ENABLE_WEBHOOKS': True,
-    
-    'WEBHOOKS': [
-        {
-            'path': '/wallet/api/webhook/monnify/',
-            'method': 'POST',
-            'description': 'Webhook endpoint for Monnify payment notifications. Receives payment confirmations, withdrawal status updates, and account events.',
-            'request': {
-                'example': {
-                    'eventType': 'TRANSACTION_COMPLETED',
-                    'eventTimestamp': '2024-01-15T10:30:00.000Z',
-                    'reference': 'MNFY-REF-123',
-                    'amount': 5000.00,
-                }
-            },
-            'response': {
-                'example': {
-                    'status': 'success'
-                }
-            }
-        },
-    ],
 }

@@ -113,7 +113,12 @@ class AllTransactionsView(APIView):
 class AllTransactionsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
+    serializer_class = TransactionSerializer
 
+    @extend_schema(
+        responses={200: dict},
+        tags=['Wallet'],
+    )
     def get(self, request):
         user = get_user_from_token(request)
         txs = Transaction.objects.filter(user=user).order_by("-created_at")

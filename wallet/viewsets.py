@@ -57,6 +57,8 @@ class WalletViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Return wallet for the authenticated user only."""
+        if getattr(self, 'swagger_fake_view', False):
+            return Wallet.objects.none()
         return Wallet.objects.filter(user=self.request.user)
 
     @action(detail=False, methods=['get'], url_path='balance')
@@ -103,6 +105,8 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Return transactions for the authenticated user only."""
+        if getattr(self, 'swagger_fake_view', False):
+            return Transaction.objects.none()
         return Transaction.objects.filter(user=self.request.user)
 
     @action(detail=False, methods=['get'], url_path='history')
@@ -141,6 +145,8 @@ class WithdrawalViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Return withdrawals for the authenticated user only."""
+        if getattr(self, 'swagger_fake_view', False):
+            return Withdrawal.objects.none()
         return Withdrawal.objects.filter(user=self.request.user)
 
     def get_serializer_class(self):
