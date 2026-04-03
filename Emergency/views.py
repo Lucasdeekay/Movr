@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from drf_spectacular.utils import extend_schema
+
 from django.utils import timezone
 
 from Auth.views import get_user_from_token
@@ -15,7 +15,6 @@ class TriggerSOSView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=EmergencySOSSerializer, responses={201: EmergencySOSSerializer}, tags=['Emergency'])
     def post(self, request):
         user = get_user_from_token(request)
         serializer = EmergencySOSSerializer(data=request.data)
@@ -37,7 +36,6 @@ class GetSOSAlertsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(responses={200: EmergencySOSSerializer(many=True)}, tags=['Emergency'])
     def get(self, request):
         user = get_user_from_token(request)
         if user.is_staff:
@@ -51,7 +49,6 @@ class AcknowledgeSOSView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=EmergencySOSSerializer, responses={200: EmergencySOSSerializer}, tags=['Emergency'])
     def post(self, request, sos_id):
         user = get_user_from_token(request)
         if not user.is_staff:
@@ -70,7 +67,6 @@ class ResolveSOSView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=EmergencySOSSerializer, responses={200: EmergencySOSSerializer}, tags=['Emergency'])
     def post(self, request, sos_id):
         user = get_user_from_token(request)
         if not user.is_staff:

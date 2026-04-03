@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from drf_spectacular.utils import extend_schema, OpenApiExample
+
 from django.utils import timezone
 
 from Auth.models import CustomUser
@@ -23,28 +23,6 @@ class CreateRouteView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        request=RouteSerializer,
-        responses={201: RouteSerializer, 400: dict},
-        tags=['Routes'],
-        examples=[
-            OpenApiExample(
-                'Create Route',
-                value={
-                    'location': 'Lagos',
-                    'location_latitude': '6.5244',
-                    'location_longitude': '3.3792',
-                    'destination': 'Abuja',
-                    'destination_latitude': '9.0765',
-                    'destination_longitude': '7.3986',
-                    'transportation_mode': 'car',
-                    'departure_time': '2024-01-15T08:00:00Z',
-                    'service_type': 'ride'
-                },
-                request_only=True,
-            ),
-        ],
-    )
     def post(self, request):
         user = get_user_from_token(request)
         serializer = RouteSerializer(data=request.data)
@@ -64,11 +42,6 @@ class CreateScheduledRouteView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        request=ScheduledRouteSerializer,
-        responses={201: ScheduledRouteSerializer, 400: dict},
-        tags=['Routes'],
-    )
     def post(self, request):
         user = get_user_from_token(request)
         serializer = ScheduledRouteSerializer(data=request.data)
@@ -85,10 +58,6 @@ class UserRoutesView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: RouteSerializer(many=True)},
-        tags=['Routes'],
-    )
     def get(self, request):
         user = get_user_from_token(request)
         routes = Route.objects.filter(user=user)
@@ -103,10 +72,6 @@ class ToggleIsLiveRouteView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: dict, 404: dict},
-        tags=['Routes'],
-    )
     def post(self, request, route_id):
         user = get_user_from_token(request)
         try:
@@ -143,10 +108,6 @@ class GetScheduledRoutesView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: ScheduledRouteSerializer(many=True)},
-        tags=['Routes'],
-    )
     def get(self, request):
         user = get_user_from_token(request)
         scheduled_routes = ScheduledRoute.objects.filter(user=user, is_active=True)
@@ -161,10 +122,6 @@ class GetLiveRoutesCountView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: dict},
-        tags=['Routes'],
-    )
     def get(self, request):
         user = get_user_from_token(request)
         count = Route.objects.filter(user=user, is_live=True).count()
@@ -178,10 +135,6 @@ class DaysListView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: DaySerializer(many=True)},
-        tags=['Routes'],
-    )
     def get(self, request):
         days = Day.objects.all()
         serializer = DaySerializer(days, many=True)

@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+
 from django.core.files.uploadedfile import InMemoryUploadedFile
 
 from Auth.views import get_user_from_token
@@ -40,18 +40,6 @@ class UpdateKYCView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     
-    @extend_schema(
-        request=KYCSerializer,
-        responses={200: KYCSerializer, 400: dict},
-        tags=['Profile'],
-        examples=[
-            OpenApiExample(
-                'KYC Update Example',
-                value={'bvn': '12345678901', 'nin': '12345678901'},
-                request_only=True,
-            ),
-        ]
-    )
     def post(self, request):
         """Handle POST requests for updating KYC information."""
         user = get_user_from_token(request)
@@ -115,23 +103,6 @@ class UpdateVehicleInfoView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     
-    @extend_schema(
-        request=VehicleSerializer,
-        responses={200: VehicleSerializer, 400: dict},
-        tags=['Profile'],
-        examples=[
-            OpenApiExample(
-                'Vehicle Update Example',
-                value={
-                    'vehicle_plate_number': 'XYZ987ABC',
-                    'vehicle_type': 'Truck',
-                    'vehicle_brand': 'Ford',
-                    'vehicle_color': 'Blue'
-                },
-                request_only=True,
-            ),
-        ]
-    )
     def post(self, request):
         """Handle POST requests for updating vehicle information."""
         user = get_user_from_token(request)
@@ -195,16 +166,6 @@ class ProfileImageUploadView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     
-    @extend_schema(
-        tags=['Profile'],
-        examples=[
-            OpenApiExample(
-                'Profile Image Upload Example',
-                value={'profile_picture': '<binary file>'},
-                request_only=True,
-            ),
-        ]
-    )
     def post(self, request):
         """Handle POST requests for uploading profile image."""
         user = get_user_from_token(request)
@@ -256,16 +217,6 @@ class UpdatePersonalInfoView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     
-    @extend_schema(
-        tags=['Profile'],
-        examples=[
-            OpenApiExample(
-                'Personal Info Update Example',
-                value={'first_name': 'John', 'last_name': 'Doe', 'phone_number': '+2348012345678'},
-                request_only=True,
-            ),
-        ]
-    )
     def post(self, request):
         """Handle POST requests for updating personal information."""
         user = get_user_from_token(request)
@@ -302,16 +253,6 @@ class UpdateSubscriptionPlanView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     
-    @extend_schema(
-        tags=['Profile'],
-        examples=[
-            OpenApiExample(
-                'Subscription Update Example',
-                value={'plan_name': 'basic'},
-                request_only=True,
-            ),
-        ]
-    )
     def post(self, request):
         """Handle POST requests for updating subscription plan."""
         user = get_user_from_token(request)
@@ -357,10 +298,6 @@ class GetNotificationsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     
-    @extend_schema(
-        responses={200: NotificationSerializer},
-        tags=['Profile']
-    )
     def get(self, request):
         """Handle GET requests for retrieving notifications."""
         user = get_user_from_token(request)
@@ -378,9 +315,6 @@ class MarkNotificationAsReadView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     
-    @extend_schema(
-        tags=['Profile']
-    )
     def post(self, request, notification_id):
         """Handle POST requests for marking notification as read."""
         user = get_user_from_token(request)
@@ -418,11 +352,6 @@ class UpdateSocialMediaLinkView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     
-    @extend_schema(
-        request=SocialMediaLinkSerializer,
-        responses={200: SocialMediaLinkSerializer, 400: dict},
-        tags=['Profile']
-    )
     def post(self, request):
         """Handle POST requests for updating social media links."""
         user = get_user_from_token(request)

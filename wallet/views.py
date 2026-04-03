@@ -22,7 +22,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from drf_spectacular.utils import extend_schema, OpenApiExample
+
 
 from Auth.views import get_user_from_token
 from Profile.models import Notification
@@ -65,10 +65,6 @@ class WalletDetailsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: dict},
-        tags=['Wallet'],
-    )
     def get(self, request):
         user = get_user_from_token(request)
         wallet, _ = Wallet.objects.get_or_create(user=user)
@@ -89,10 +85,6 @@ class AllTransactionsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: dict},
-        tags=['Wallet'],
-    )
     def get(self, request):
         user = get_user_from_token(request)
         wallet, _ = Wallet.objects.get_or_create(user=user)
@@ -115,10 +107,6 @@ class AllTransactionsView(APIView):
     permission_classes = [IsAuthenticated]
     serializer_class = TransactionSerializer
 
-    @extend_schema(
-        responses={200: dict},
-        tags=['Wallet'],
-    )
     def get(self, request):
         user = get_user_from_token(request)
         txs = Transaction.objects.filter(user=user).order_by("-created_at")
@@ -132,10 +120,6 @@ class TransactionDetailView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: dict, 404: dict},
-        tags=['Wallet'],
-    )
     def get(self, request, pk):
         try:
             user = get_user_from_token(request)
@@ -157,11 +141,6 @@ class WithdrawalRequestView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        request=WithdrawalRequestSerializer,
-        responses={201: dict, 400: dict},
-        tags=['Wallet'],
-    )
     def post(self, request):
         user = get_user_from_token(request)
         serializer = WithdrawalRequestSerializer(data=request.data)
@@ -190,11 +169,6 @@ class MonnifyWebhookView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
-    @extend_schema(
-        request=dict,
-        responses={200: dict, 400: dict, 403: dict},
-        tags=['Wallet'],
-    )
     def post(self, request, *args, **kwargs):
         sig = request.headers.get("monnify-signature")
         if not _verify_monnify_signature(request.body, sig):
@@ -330,10 +304,6 @@ class FetchBanksView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
-    @extend_schema(
-        responses={200: dict},
-        tags=['Wallet'],
-    )
     def get(self, request, *args, **kwargs):
         bank_list = get_active_banks()
         return Response({"banks": bank_list}, status=status.HTTP_200_OK)
@@ -342,11 +312,6 @@ class ValidateAccountView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
-    @extend_schema(
-        request=dict,
-        responses={200: dict, 400: dict},
-        tags=['Wallet'],
-    )
     def post(self, request, *args, **kwargs):
         account_number = request.data.get("account_number")
         bank_code = request.data.get("bank_code")

@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from drf_spectacular.utils import extend_schema
+
 
 from Auth.views import get_user_from_token
 from .models import ChatConversation, ChatMessage
@@ -14,7 +14,6 @@ class SendChatMessageView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=ChatMessageSerializer, responses={201: ChatMessageSerializer}, tags=['Chat'])
     def post(self, request):
         user = get_user_from_token(request)
         serializer = ChatMessageSerializer(data=request.data)
@@ -40,7 +39,6 @@ class GetConversationMessagesView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(responses={200: ChatMessageSerializer(many=True)}, tags=['Chat'])
     def get(self, request, conversation_id):
         user = get_user_from_token(request)
         try:
@@ -57,7 +55,6 @@ class GetUserConversationsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(responses={200: ChatConversationSerializer(many=True)}, tags=['Chat'])
     def get(self, request):
         user = get_user_from_token(request)
         conversations = ChatConversation.objects.filter(participants=user, is_active=True)
@@ -68,7 +65,6 @@ class CreateConversationView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=ChatConversationSerializer, responses={201: ChatConversationSerializer}, tags=['Chat'])
     def post(self, request):
         user = get_user_from_token(request)
         serializer = ChatConversationSerializer(data=request.data)

@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from drf_spectacular.utils import extend_schema, OpenApiExample
+
 from django.db import models
 from django.utils import timezone
 
@@ -17,23 +17,6 @@ class PackageSubmissionView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        request=PackageSerializer,
-        responses={201: PackageSerializer, 400: dict},
-        tags=['Packages'],
-        examples=[
-            OpenApiExample('Submit Package', value={
-                'location': 'Lagos',
-                'destination': 'Abuja',
-                'package_type': 'Delivery',
-                'item_description': 'Electronics',
-                'item_weight': 'medium',
-                'receiver_name': 'John Doe',
-                'receiver_phone_number': '+2348012345678',
-                'range_radius': '10.00'
-            }, request_only=True)
-        ]
-    )
     def post(self, request):
         user = get_user_from_token(request)
         serializer = PackageSerializer(data=request.data)
@@ -63,11 +46,6 @@ class PlaceBidView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        request=BidSerializer,
-        responses={201: BidSerializer, 400: dict},
-        tags=['Packages'],
-    )
     def post(self, request, package_id):
         user = get_user_from_token(request)
         try:
@@ -87,10 +65,6 @@ class GetAllBidsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: BidSerializer(many=True)},
-        tags=['Packages'],
-    )
     def get(self, request, package_id):
         get_user_from_token(request)
         try:
@@ -106,10 +80,6 @@ class GetBidDetailView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: BidSerializer, 404: dict},
-        tags=['Packages'],
-    )
     def get(self, request, bid_id):
         get_user_from_token(request)
         try:
@@ -125,10 +95,6 @@ class SelectMoverView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={201: PackageOfferSerializer, 400: dict, 404: dict},
-        tags=['Packages'],
-    )
     def post(self, request, bid_id):
         user = get_user_from_token(request)
         try:
@@ -163,10 +129,6 @@ class GetAllPackageOffersView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: PackageOfferSerializer(many=True)},
-        tags=['Packages'],
-    )
     def get(self, request):
         user = get_user_from_token(request)
         offers = PackageOffer.objects.filter(
@@ -181,10 +143,6 @@ class GetPackageOfferDetailView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: PackageOfferSerializer, 404: dict},
-        tags=['Packages'],
-    )
     def get(self, request, package_offer_id):
         user = get_user_from_token(request)
         try:
@@ -202,10 +160,6 @@ class PickupConfirmationView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: dict, 404: dict},
-        tags=['Packages'],
-    )
     def post(self, request, package_offer_id):
         user = get_user_from_token(request)
         try:
@@ -228,10 +182,6 @@ class DeliveryConfirmationView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: dict, 404: dict},
-        tags=['Packages'],
-    )
     def post(self, request, package_offer_id):
         user = get_user_from_token(request)
         try:
@@ -254,10 +204,6 @@ class PickedUpPackageOffersView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: PackageOfferSerializer(many=True)},
-        tags=['Packages'],
-    )
     def get(self, request):
         user = get_user_from_token(request)
         offers = PackageOffer.objects.filter(driver=user, picked_up=True, delivered=False)
@@ -270,10 +216,6 @@ class ScheduledPackageOffersView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        responses={200: PackageOfferSerializer(many=True)},
-        tags=['Packages'],
-    )
     def get(self, request):
         user = get_user_from_token(request)
         offers = PackageOffer.objects.filter(driver=user, picked_up=False)
@@ -286,11 +228,6 @@ class CancelPackageOfferView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        request=dict,
-        responses={200: dict, 400: dict, 404: dict},
-        tags=['Packages'],
-    )
     def post(self, request, pk):
         user = get_user_from_token(request)
         try:
