@@ -256,16 +256,4 @@ SPECTACULAR_SETTINGS = {
     },
 
     'COMPONENT_SPLIT_REQUEST': True,
-
-    'TAGS': [
-        {'name': 'Authentication', 'description': 'User authentication and registration endpoints'},
-        {'name': 'User Profile', 'description': 'User profile and KYC management'},
-        {'name': 'Routes', 'description': 'Route creation and management'},
-        {'name': 'Packages', 'description': 'Package delivery and bidding'},
-        {'name': 'Chat', 'description': 'Real-time chat messaging'},
-        {'name': 'Presence', 'description': 'Online/offline status and location tracking'},
-        {'name': 'Emergency', 'description': 'Emergency SOS alerts'},
-        {'name': 'Wallet', 'description': 'Wallet and payment management'},
-        {'name': 'Real-Time', 'description': 'WebSocket and real-time features'},
-    ],
 }
